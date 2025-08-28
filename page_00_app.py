@@ -8,7 +8,7 @@ from page_99_Utils import center_window, create_password_popup  # ฟังก�
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("VSScale UI")
+        self.title("VSScale UI")    
         self.resizable(True, True)
 
         # สร้าง frames สำหรับแต่ละหน้า
