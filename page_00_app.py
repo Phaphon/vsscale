@@ -1,6 +1,6 @@
 import tkinter as tk
 from page_01_Home import HomePage
-from page_02_History import HistoryPage
+from page_02_test_History import HistoryPage
 from page_03_Add import AddPage
 from page_04_Setting import SettingPage
 from page_99_Utils import center_window, create_password_popup  # ฟังก์ชันสำหรับจัดกลางหน้าจอ
