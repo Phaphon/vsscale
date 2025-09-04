@@ -1,4 +1,5 @@
 import tkinter as tk
+import mysql.connector
 
 def create_centered_popup(master, width, height, title=""):
 
@@ -121,4 +122,34 @@ def create_password_popup(parent, correct_password, message="กรุณาใ�
     popup.deiconify()
 
     return popup
+
+
+# ค่าตั้งต้น (สามารถแก้ได้จากหน้า Setting)
+db_config = {
+    "host": "localhost",
+    "user": "root",
+    "password": "1234",
+    "database": "rpisql",
+    "station": "1",
+}
+
+def set_db_config(host, user, password, database, station):
+    """ฟังก์ชันอัปเดตค่าการเชื่อมต่อ DB"""
+    global db_config
+    db_config = {
+        "host": host,
+        "user": user,
+        "password": password,
+        "database": database,
+        "station": station
+    }
+
+def get_db_connection():
+    """ฟังก์ชันคืนค่า connection สำหรับ MySQL"""
+    return mysql.connector.connect(
+        host=db_config["host"],
+        user=db_config["user"],
+        password=db_config["password"],
+        database=db_config["database"]
+    )
 
