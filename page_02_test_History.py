@@ -35,9 +35,9 @@ class HistoryPage(tk.Frame):
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT
-                    pd_item_id,        -- เลขรายการ
-                    pd_item_number,    -- เลขย่อ
-                    resource_id,       -- ผู้ผลิต
+                    pd_item_number,        -- เลขรายการ
+                    pd_item_remark,    -- เลขย่อ
+                    emp_id,            -- ผู้ผลิต
                     result_id,         -- สินค้า
                     pd_weight          -- น้ำหนัก
                 FROM pd_item
@@ -49,9 +49,9 @@ class HistoryPage(tk.Frame):
             self.data = []
             for row in rows:
                 self.data.append([
-                    row[0],  # เลขรายการ -> pd_item_id
-                    row[1],  # เลขย่อ -> pd_item_number
-                    row[2],  # ผู้ผลิต -> resource_id
+                    row[0],  # เลขรายการ -> pd_item_number
+                    row[1],  # เลขย่อ -> pd_item_remark
+                    row[2],  # ผู้ผลิต -> emp_id
                     row[3],  # สินค้า -> result_id
                     row[4],  # น้ำหนัก -> pd_weight
                 ])
