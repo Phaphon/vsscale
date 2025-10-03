@@ -1,63 +1,90 @@
 # page_03_Add.py
 import tkinter as tk
 from tkinter import ttk
-from page_99_Utils import create_confirm_popup, create_password_popup
-# Mock database
-PRODUCTS = ["สินค้าA", "สินค้าB", "สินค้าC"]
-PRODUCERS = ["บริษัท1", "บริษัท2", "บริษัท3"]
-
-# สำหรับ weight controller (mock)
-from vsscale_weight_controller import read_weight, set_zero  # จะต้องมีไฟล์นี้
+from page_99_Utils import (
+    create_confirm_popup,
+    get_db_connection,
+    reset_db_connection,
+    read_station_id,
+    read_weight,
+    set_zero
+)
 
 class AddPage(tk.Frame):
     def __init__(self, master, go_back):
         super().__init__(master)
 
-        # --- 1. ชื่อหน้า ---
-        tk.Label(self, text="เพิ่มรายการ", font=("Arial", 18, "bold"))\
-            .pack(pady=10)
+        tk.Label(self, text="เพิ่มรายการ", font=("Arial", 18, "bold")).pack(pady=10)
 
-        # --- กรอบ content ---
         content = tk.Frame(self, padx=20, pady=10)
         content.pack(expand=True, fill="both")
 
-        # --- StringVar สำหรับ input ---
         self.abbr_var = tk.StringVar()
         self.product_var = tk.StringVar()
         self.producer_var = tk.StringVar()
         self.weight_var = tk.StringVar(value=str(read_weight()))
 
-        # --- 2 & 3. เลขย่อ และ สินค้า ---
+        # --- เตรียมค่า Combobox จาก DB ---
+        self.mat_map = {}
+        self.mat_map_reverse = {}
+        self.emp_map = {}
+        self.emp_map_reverse = {}
+
+        conn = None
+        cur = None
+        try:
+            # รีเฟรช connection ทุกครั้งเพื่อใช้ค่าคอนฟิกล่าสุด
+            reset_db_connection()
+            conn = get_db_connection()
+            cur = conn.cursor()
+
+            # ดึงสินค้า
+            cur.execute("SELECT mat_id, mat_label_name FROM materials")
+            for mid, name in cur.fetchall():
+                self.mat_map[mid] = name
+                self.mat_map_reverse[name] = mid
+
+            # ดึงผู้ผลิต
+            cur.execute("SELECT emp_id, emp_name FROM v_emp")
+            for eid, name in cur.fetchall():
+                self.emp_map[eid] = name
+                self.emp_map_reverse[name] = eid
+
+        except Exception as e:
+            print("❌ โหลดข้อมูลสินค้า/ผู้ผลิตล้มเหลว:", e)
+
+        finally:
+            # ป้องกัน error ถ้า conn หรือ cur ไม่ถูกสร้าง
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
+
+        # --- Input Fields ---
         tk.Label(content, text="เลขย่อ:").grid(row=0, column=0, sticky="e", padx=5, pady=6)
-        tk.Entry(content, textvariable=self.abbr_var)\
-            .grid(row=0, column=1, sticky="we", padx=5, pady=6)
+        tk.Entry(content, textvariable=self.abbr_var).grid(row=0, column=1, sticky="we", padx=5, pady=6)
 
         tk.Label(content, text="สินค้า:").grid(row=0, column=2, sticky="e", padx=5, pady=6)
-        ttk.Combobox(content, values=PRODUCTS, state="readonly", textvariable=self.product_var)\
-            .grid(row=0, column=3, sticky="we", padx=5, pady=6)
+        ttk.Combobox(content, values=sorted(self.mat_map.values()), state="readonly",
+                     textvariable=self.product_var).grid(row=0, column=3, sticky="we", padx=5, pady=6)
 
-        # --- 4 & 5. ผู้ผลิต และ น้ำหนัก ---
         tk.Label(content, text="ผู้ผลิต:").grid(row=1, column=0, sticky="e", padx=5, pady=6)
-        ttk.Combobox(content, values=PRODUCERS, state="readonly", textvariable=self.producer_var)\
-            .grid(row=1, column=1, sticky="we", padx=5, pady=6)
+        ttk.Combobox(content, values=sorted(self.emp_map.values()), state="readonly",
+                     textvariable=self.producer_var).grid(row=1, column=1, sticky="we", padx=5, pady=6)
 
         tk.Label(content, text="น้ำหนัก:").grid(row=1, column=2, sticky="e", padx=5, pady=6)
-        tk.Entry(content, textvariable=self.weight_var, state="readonly", readonlybackground="white")\
-            .grid(row=1, column=3, sticky="we", padx=5, pady=6)
+        tk.Entry(content, textvariable=self.weight_var, state="readonly",
+                 readonlybackground="white").grid(row=1, column=3, sticky="we", padx=5, pady=6)
 
-        # --- 6. ปุ่มปรับศูนย์ ---
-        tk.Button(content, text="ปรับศูนย์", width=12, command=self.zero_weight)\
-            .grid(row=2, column=0, columnspan=2, pady=10)
+        # --- ปุ่มปรับศูนย์ ---
+        tk.Button(content, text="ปรับศูนย์", width=12, command=self.zero_weight).grid(row=2, column=0, columnspan=2, pady=10)
 
-        # --- 7 & 8. ปุ่มยกเลิก / บันทึก ---
+        # --- ปุ่มยกเลิก/บันทึก ---
         btns = tk.Frame(content)
         btns.grid(row=2, column=2, columnspan=2, pady=10)
-
         tk.Button(btns, text="❌ ยกเลิก", width=10, command=go_back).pack(side="left", padx=8)
-        tk.Button(btns, text="✔ บันทึก", width=10, command=self.save_record).pack(side="left", padx=8)
-        #tk.Button(btns, text="✔ บันทึก", width=10, command=self.confirm_save).pack(side="left", padx=8)
+        tk.Button(btns, text="✔ บันทึก", width=10, command=self.confirm_save).pack(side="left", padx=8)
 
-        # ให้ column ขยายได้
         for c in range(4):
             content.grid_columnconfigure(c, weight=1)
 
@@ -65,29 +92,82 @@ class AddPage(tk.Frame):
         set_zero()
         self.weight_var.set(str(read_weight()))
 
-    def save_record(self):
+    def confirm_save(self):
         """ แสดง popup ก่อนบันทึกจริง """
-        def do_save():
-            abbr = self.abbr_var.get()
-            product = self.product_var.get()
-            producer = self.producer_var.get()
-            weight = self.weight_var.get()
+        create_confirm_popup(self, message="ยืนยันการบันทึกข้อมูลใหม่นี้?", confirm_callback=self.do_save)
 
-            if not abbr or not product or not producer:
-                print("⚠️ ข้อมูลไม่ครบถ้วน")
-                return
+    def do_save(self):
+        abbr = self.abbr_var.get()
+        product_name = self.product_var.get()
+        producer_name = self.producer_var.get()
+        weight = self.weight_var.get()
 
-            # ✅ INSERT เข้า Database (คุณต้องใส่โค้ดเชื่อมต่อ SQL Server จริง ๆ ตรงนี้)
-            print("💾 กำลังบันทึกลงฐานข้อมูล:", abbr, product, producer, weight)
+        if not abbr or not product_name or not producer_name:
+            print("⚠️ ข้อมูลไม่ครบถ้วน")
+            return
 
-            # ✅ สั่งพิมพ์ Label
-            print("🖨️ สั่งพิมพ์ Label สำหรับ:", abbr, product, producer, weight)
+        # map ชื่อสินค้าและผู้ผลิตเป็น id
+        product_id = self.mat_map_reverse.get(product_name)
+        producer_id = self.emp_map_reverse.get(producer_name)
 
-            # เคลียร์ค่า input หลังบันทึก
+        if product_id is None or producer_id is None:
+            print("⚠️ ไม่พบสินค้า หรือ ผู้ผลิตในฐานข้อมูล")
+            return
+
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+
+            # --- 1) สร้าง pd_batch_id และ batch_number ---
+            station_id = read_station_id()  # user_id หรือ station_id
+            now = time.localtime()
+            year = now.tm_year % 100
+            month = now.tm_mon
+
+            # หา sequence ล่าสุดของเดือนนี้
+            cur.execute("SELECT batch_number FROM pd WHERE batch_number LIKE %s ORDER BY pd_batch_id DESC LIMIT 1",
+                        (f"{year:02d}{month:02d}%",))
+            last = cur.fetchone()
+            seq = int(last[0][-3:]) + 1 if last else 1
+            batch_number = f"{year:02d}{month:02d}{seq:03d}"
+
+            # INSERT pd
+            cur.execute("""
+                INSERT INTO pd (batch_number, pd_pub_date, user_id, pd_status_id, pd_group_id)
+                VALUES (%s, NOW(), %s, %s, %s)
+            """, (batch_number, station_id, 1, None))
+            pd_batch_id = cur.lastrowid
+
+            # --- 2) INSERT pd_item ---
+            cur.execute("""
+                INSERT INTO pd_item (
+                    pd_batch_id, pd_item_number, resource_id, result_id, pd_weight,
+                    fac_id, emp_id, pd_item_status_id, pd_item_remark, on_stock
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                pd_batch_id,
+                "",            # pd_item_number ว่าง
+                product_id,
+                product_id,
+                weight,
+                1,             # fac_id
+                producer_id,
+                1,             # pd_item_status_id
+                abbr,
+                0              # on_stock
+            ))
+
+            conn.commit()
+            print("✅ เพิ่มข้อมูลสำเร็จ:", batch_number, abbr, product_name, producer_name, weight)
+
+            # ล้าง input
             self.abbr_var.set("")
             self.product_var.set("")
             self.producer_var.set("")
             self.weight_var.set(str(read_weight()))
 
-        # ใช้ popup ยืนยัน
-        create_confirm_popup(self, message="ยืนยันการบันทึกข้อมูลใหม่นี้?", confirm_callback=do_save)
+        except Exception as e:
+            print("❌ เพิ่มข้อมูลล้มเหลว:", e)
+        finally:
+            cur.close()
+            conn.close()

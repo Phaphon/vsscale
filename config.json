@@ -1,0 +1,9 @@
+{
+  "host": "localhost",
+  "user": "root",
+  "password": "1234",
+  "database": "rpisql",
+  "station": "1",
+  "settings_password": "adminpass",
+  "history_password": "4321"
+}
