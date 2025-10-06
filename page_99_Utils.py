@@ -133,8 +133,10 @@ def load_config():
         db_config = DEFAULT_CONFIG.copy()
         save_config()  # สร้างไฟล์ใหม่ทันที
 
-def save_config():
+def save_config(new_config):
     """บันทึกค่า config ปัจจุบันลงไฟล์"""
+    db_config.update(new_config)
+    print("dabug Saving config in function save_config:", db_config)  # debug
     try:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(db_config, f, ensure_ascii=False, indent=2)
@@ -181,9 +183,10 @@ def get_db_connection():
                 "host": db_config.get("host", "localhost"),
                 "user": db_config.get("user", "root"),
                 "password": db_config.get("password", ""),
-                "database": db_config.get("database", "")
+                "database": db_config.get("database", ""),
             }
             print("Connecting to DB with:", conn_cfg)  # debug
+            print(db_config)
             connection = mysql.connector.connect(**conn_cfg)
         except mysql.connector.Error as e:
             print(f"❌ Database connection error: {e}")

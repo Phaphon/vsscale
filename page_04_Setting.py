@@ -1,6 +1,7 @@
 import tkinter as tk
+import mysql
 from tkinter import messagebox
-from page_99_Utils import db_config, reset_db_connection
+from page_99_Utils import db_config , save_config
 
 class SettingPage(tk.Frame):
     def __init__(self, master, go_back):
@@ -40,9 +41,32 @@ class SettingPage(tk.Frame):
         self.sql_pw_entry.insert(0, db_config.get("password", ""))
         self.station_id_entry.insert(0, db_config.get("station", ""))
 
+        # ===== โหลดค่า config ปัจจุบัน =====
+        self.reload_entries_from_config()
+
         # ===== ปุ่มบันทึก =====
         tk.Button(self, text="💾 บันทึก", font=("Arial", 12, "bold"),
                   command=self.save_settings).pack(pady=15)
+
+    def reload_entries_from_config(self):
+        """โหลดค่าจาก config.json แล้วใส่กลับลงช่องกรอก"""
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+        except Exception:
+            cfg = db_config  # fallback ใช้ค่าจากตัวแปรในหน่วยความจำ
+
+        # ล้างค่าก่อน
+        self.sql_ip_entry.delete(0, tk.END)
+        self.sql_user_entry.delete(0, tk.END)
+        self.sql_pw_entry.delete(0, tk.END)
+        self.station_id_entry.delete(0, tk.END)
+
+        # ใส่ค่าปัจจุบันกลับ
+        self.sql_ip_entry.insert(0, cfg.get("host", ""))
+        self.sql_user_entry.insert(0, cfg.get("user", ""))
+        self.sql_pw_entry.insert(0, cfg.get("password", ""))
+        self.station_id_entry.insert(0, cfg.get("station", ""))
 
     def save_settings(self):
         host = self.sql_ip_entry.get().strip()
@@ -67,8 +91,11 @@ class SettingPage(tk.Frame):
 
             # ✅ เชื่อมต่อผ่านแล้ว ค่อยอัปเดตและบันทึก
             db_config.update(new_config)
-            reset_db_connection()
-            save_config()  # ← ย้ายมาบันทึกหลังจากเชื่อมต่อสำเร็จเท่านั้น
+
+            save_config(db_config)
+
             messagebox.showinfo("บันทึก", "✅ บันทึกการตั้งค่าและเชื่อมต่อใหม่เรียบร้อยแล้ว!")
         except Exception as e:
             messagebox.showerror("ผิดพลาด", f"❌ เชื่อมต่อฐานข้อมูลไม่ได้:\n{e}")
+            # โหลดค่าจาก config.json กลับไปในช่อง input
+            self.reload_entries_from_config()
