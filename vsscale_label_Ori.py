@@ -49,6 +49,18 @@ def print_label(
             s.write((cmd + "\r\n").encode("ascii"))
             time.sleep(0.01)
 
+
+        print("data")
+        print("header_text:",header_text)
+        print("table_text:",table_text)
+        print("product_name:",product_name)
+        print("pd_item_number:",pd_item_number)
+        print("pd_date:",pd_date)
+        print("mat_size:",mat_size)
+        print("mat_grade:",mat_grade)
+        print("pd_weight:",pd_weight)
+        print("pd_item_remark:",pd_item_remark)
+
         send("SIZE 50 mm,80 mm")
         send("CLS")
         send(f"PUTBMP 0,0,\"{header_text}\"")
@@ -61,3 +73,4 @@ def print_label(
         s.write(f"BITMAP 290,350,{width_bytes},{img.height},1,".encode("ascii"))
         s.write(img_data)
         send("PRINT 1")
+        print("Label sent to printer.")

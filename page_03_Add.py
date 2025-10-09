@@ -1,14 +1,14 @@
 # page_03_Add.py
+import time
 import tkinter as tk
 from tkinter import ttk
 from page_99_Utils import (
     create_confirm_popup,
     get_db_connection,
     reset_db_connection,
-    read_station_id,
-    read_weight,
-    set_zero
+    read_station_id
 )
+from vsscale_weight_controller_Ori import read_weight, set_zero
 
 class AddPage(tk.Frame):
     def __init__(self, master, go_back):
@@ -88,9 +88,26 @@ class AddPage(tk.Frame):
         for c in range(4):
             content.grid_columnconfigure(c, weight=1)
 
+        self.update_weight_loop()
+
+    def update_weight_loop(self):
+        """อ่านน้ำหนักจากเครื่องชั่งและอัปเดตทุก 0.5 วินาที"""
+        try:
+            weight = read_weight()
+            if weight is not None:
+                self.weight_var.set(str(weight))
+        except Exception as e:
+            print("❌ อ่านน้ำหนักล้มเหลว:", e)
+        finally:
+            # เรียกตัวเองซ้ำทุก 500 ms
+            self.after(500, self.update_weight_loop)
+
     def zero_weight(self):
+        """ปรับศูนย์และอ่านน้ำหนักใหม่ทันที"""
         set_zero()
-        self.weight_var.set(str(read_weight()))
+        weight = read_weight()
+        if weight is not None:
+            self.weight_var.set(str(weight))
 
     def confirm_save(self):
         """ แสดง popup ก่อนบันทึกจริง """

@@ -207,12 +207,12 @@ def read_station_id():
     return db_config.get("station", "1")
 
 _weight = 0
-def read_weight():
-    return _weight
+# def read_weight():
+#     return _weight
 
-def set_zero():
-    global _weight
-    _weight = 0
+# def set_zero():
+#     global _weight
+#     _weight = 0
 
 # โหลด config ตอนเริ่มต้นโมดูล
 load_config()

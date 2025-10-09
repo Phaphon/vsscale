@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 from page_99_Utils import create_centered_popup, create_password_popup, create_confirm_popup, get_db_connection, get_password, get_db_connection, reset_db_connection
-from vsscale_label import print_label
+from vsscale_label_Ori import print_label
 
 ROWS_PER_PAGE = 5
 
@@ -238,16 +238,16 @@ class HistoryPage(tk.Frame):
         """แสดง confirm popup ก่อนปริ้น"""
         def do_print():
             print_label(
-                port="/dev/ttyUSB0",
-                baud=9600,
-                header_text="Header",
-                table_text="Table",
+                port="/dev/ttySC1",
+                baud=115200,
+                header_text="header_747_270.bmp",
+                table_text="table_vj_mono_2_270.bmp",
                 product_name=row_data[3],
                 pd_item_number=row_data[1],
-                pd_date="2025-08-17",
+                pd_date="2099-99-99",
                 mat_size="Size",
                 mat_grade="Grade",
-                pd_weight=row_data[4],
+                pd_weight=row_data[5],
                 pd_item_remark="",
             )
 
