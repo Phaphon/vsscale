@@ -15,8 +15,7 @@ class App(tk.Tk):
 
         # โหลดค่าจากไฟล์ก่อนใช้
         load_config()
-        self.title("VSScale UI")
-        self.configure(bg="#f4faff")  # 💠 สีพื้นหลังอ่อนฟ้าให้ตรงธีม
+        self.title("VSScale UI")    
         self.resizable(True, True)
         
 
@@ -69,13 +68,6 @@ class App(tk.Tk):
         )
 
     def show_frame(self, name):
-        frame = self.frames[name]
-        if name == "History":
-            frame.load_data()
-            frame.display_table()
-        frame.tkraise()
-
-
         # หยุดการอ่านน้ำหนักถ้าออกจากหน้า Add
         if "Add" in self.frames:
             self.frames["Add"].stop_weight_loop()

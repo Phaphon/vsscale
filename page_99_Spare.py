@@ -4,12 +4,11 @@ import json, os
 
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "config.json")
 
-# ===== Popup utilities (themed) =====
+# ===== Popup utilities =====
 def create_centered_popup(master, width, height, title=""):
     popup = tk.Toplevel(master)
     popup.withdraw()
     popup.title(title)
-    popup.configure(bg="#f4faff")  # 💠 พื้นหลังอ่อนฟ้า
     popup.protocol("WM_DELETE_WINDOW", popup.destroy)
 
     def show():
@@ -38,41 +37,24 @@ def create_confirm_popup(parent, message="ยืนยัน?", confirm_callback
     confirm = tk.Toplevel(parent)
     confirm.withdraw()
     confirm.title("ยืนยัน")
-    confirm.configure(bg="#f4faff")
     confirm.transient(parent)
     confirm.grab_set()
     confirm.focus_force()
 
-    # ข้อความ
-    tk.Label(
-        confirm, text=message, 
-        font=("Segoe UI", 12), 
-        bg="#f4faff", fg="#003366"
-    ).pack(pady=15, padx=20)
+    tk.Label(confirm, text=message, font=("Arial", 12)).pack(pady=10)
 
-    # ปุ่ม
     def on_confirm():
         if confirm_callback:
             confirm_callback()
         confirm.destroy()
 
-    btns = tk.Frame(confirm, bg="#f4faff")
+    btns = tk.Frame(confirm)
     btns.pack(pady=10)
-
-    style_btn = {
-        "width": 10,
-        "font": ("Segoe UI", 10, "bold"),
-        "relief": "flat",
-        "bd": 0,
-        "cursor": "hand2",
-        "activebackground": "#d3ebff"
-    }
-
-    tk.Button(btns, text="ยกเลิก", bg="#d0e7ff", fg="#003366", command=confirm.destroy, **style_btn).pack(side="left", padx=8)
-    tk.Button(btns, text="ตกลง", bg="#b5dcff", fg="#003366", command=on_confirm, **style_btn).pack(side="left", padx=8)
+    tk.Button(btns, text="ยกเลิก", width=10, command=confirm.destroy).pack(side="left", padx=6)
+    tk.Button(btns, text="ตกลง", width=10, command=on_confirm).pack(side="left", padx=6)
 
     confirm.update_idletasks()
-    w, h = 280, 150
+    w, h = 260, 120
     x = (confirm.winfo_screenwidth() // 2) - (w // 2)
     y = (confirm.winfo_screenheight() // 2) - (h // 2)
     confirm.geometry(f"{w}x{h}+{x}+{y}")
@@ -84,29 +66,18 @@ def create_password_popup(parent, correct_password, message="กรุณาใ�
     popup = tk.Toplevel(parent)
     popup.withdraw()
     popup.title("รหัสผ่าน")
-    popup.configure(bg="#f4faff")
     popup.transient(parent)
     popup.grab_set()
     popup.focus_force()
 
-    # หัวข้อ
-    tk.Label(
-        popup, text=message, 
-        font=("Segoe UI", 12), 
-        bg="#f4faff", fg="#003366"
-    ).pack(pady=(15, 5))
+    tk.Label(popup, text=message, font=("Arial", 12)).pack(pady=10)
 
-    # ช่องกรอก
     pw_var = tk.StringVar()
-    entry = tk.Entry(
-        popup, textvariable=pw_var, show="*", 
-        width=22, font=("Segoe UI", 11),
-        relief="solid", bd=1, highlightbackground="#b5dcff", highlightcolor="#66b3ff"
-    )
-    entry.pack(pady=6)
+    entry = tk.Entry(popup, textvariable=pw_var, show="*", width=20)
+    entry.pack(pady=5)
     entry.focus_set()
 
-    msg_label = tk.Label(popup, text="", font=("Segoe UI", 10), fg="red", bg="#f4faff")
+    msg_label = tk.Label(popup, text="", font=("Arial", 10), fg="red")
     msg_label.pack()
 
     def on_confirm():
@@ -119,23 +90,13 @@ def create_password_popup(parent, correct_password, message="กรุณาใ�
             pw_var.set("")
             entry.focus_set()
 
-    btns = tk.Frame(popup, bg="#f4faff")
-    btns.pack(pady=15)
-
-    style_btn = {
-        "width": 10,
-        "font": ("Segoe UI", 10, "bold"),
-        "relief": "flat",
-        "bd": 0,
-        "cursor": "hand2",
-        "activebackground": "#d3ebff"
-    }
-
-    tk.Button(btns, text="ยกเลิก", bg="#d0e7ff", fg="#003366", command=popup.destroy, **style_btn).pack(side="left", padx=8)
-    tk.Button(btns, text="ตกลง", bg="#b5dcff", fg="#003366", command=on_confirm, **style_btn).pack(side="left", padx=8)
+    btns = tk.Frame(popup)
+    btns.pack(pady=10)
+    tk.Button(btns, text="ยกเลิก", width=10, command=popup.destroy).pack(side="left", padx=6)
+    tk.Button(btns, text="ตกลง", width=10, command=on_confirm).pack(side="left", padx=6)
 
     popup.update_idletasks()
-    w, h = 320, 190
+    w, h = 300, 160
     x = (popup.winfo_screenwidth() // 2) - (w // 2)
     y = (popup.winfo_screenheight() // 2) - (h // 2)
     popup.geometry(f"{w}x{h}+{x}+{y}")
@@ -241,9 +202,17 @@ def reset_db_connection():
     connection = None
     return get_db_connection()
 
-# ===== Station =====
+# ===== Station & Weight mock =====
 def read_station_id():
-    return db_config.get("station", "2")#Default station2
+    return db_config.get("station", "2")
+
+_weight = 0
+# def read_weight():
+#     return _weight
+
+# def set_zero():
+#     global _weight
+#     _weight = 0
 
 # โหลด config ตอนเริ่มต้นโมดูล
 load_config()

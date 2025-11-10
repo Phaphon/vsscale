@@ -1,48 +1,32 @@
 import tkinter as tk
+import mysql
 from tkinter import messagebox
-from page_99_Utils import db_config, save_config
-import mysql.connector
-import json
+from page_99_Utils import db_config , save_config
 
 class SettingPage(tk.Frame):
     def __init__(self, master, go_back):
-        super().__init__(master, bg="#f4faff")
-
-        # ===== กรอบรวมทั้งหมด =====
-        container = tk.Frame(self, bg="#f4faff")
-        container.place(relx=0.5, rely=0.5, anchor="center")  # กึ่งกลางหน้าจอ
+        super().__init__(master)
 
         # ===== ปุ่มย้อนกลับ =====
-        tk.Button(
-            container, text="⬅ ย้อนกลับ", command=go_back,
-            bg="#b5dcff", fg="#003366", activebackground="#d3ebff",
-            font=("Segoe UI", 11, "bold"), bd=0, relief="flat", cursor="hand2"
-        ).pack(anchor="nw", padx=5, pady=5)
+        tk.Button(self, text="⬅ ย้อนกลับ", command=go_back).pack(anchor="nw", padx=5, pady=5)
 
         # ===== ชื่อหน้า =====
-        tk.Label(
-            container, text="⚙ ตั้งค่า", font=("Segoe UI", 20, "bold"),
-            bg="#f4faff", fg="#003366"
-        ).pack(pady=(10, 20))
+        tk.Label(self, text="ตั้งค่า", font=("Arial", 16, "bold")).pack(pady=10)
 
         # ===== กรอบหลักสำหรับฟอร์ม =====
-        form_frame = tk.Frame(container, bg="white", bd=1, relief="solid")
-        form_frame.pack(padx=20, pady=10, fill="both")
-        form_frame.grid_columnconfigure(1, weight=1)
+        form_frame = tk.Frame(self)
+        form_frame.pack(expand=True)
 
         # ฟังก์ชันช่วยสร้างแถว input
         def create_row(parent, label_text, entry_width=30):
-            row = tk.Frame(parent, bg="white")
-            row.pack(fill="x", pady=8)
+            row = tk.Frame(parent)
+            row.pack(fill="x", pady=6)
 
-            lbl = tk.Label(
-                row, text=label_text, width=15, anchor="w",
-                font=("Segoe UI", 12), bg="white", fg="#003366"
-            )
+            lbl = tk.Label(row, text=label_text, width=15, anchor="w", font=("Arial", 12))
             lbl.pack(side="left", padx=5)
 
-            entry = tk.Entry(row, width=entry_width, font=("Segoe UI", 12), bd=1, relief="solid")
-            entry.pack(side="left", padx=5, fill="x", expand=True)
+            entry = tk.Entry(row, width=entry_width, font=("Arial", 12))
+            entry.pack(side="left", padx=5)
             return entry
 
         # ===== สร้างช่องกรอก =====
@@ -57,21 +41,20 @@ class SettingPage(tk.Frame):
         self.sql_pw_entry.insert(0, db_config.get("password", ""))
         self.station_id_entry.insert(0, db_config.get("station", ""))
 
+        # ===== โหลดค่า config ปัจจุบัน =====
+        self.reload_entries_from_config()
+
         # ===== ปุ่มบันทึก =====
-        tk.Button(
-            container, text="บันทึก", font=("Segoe UI", 12, "bold"),
-            bg="#b5dcff", fg="#003366", activebackground="#d3ebff",
-            bd=0, relief="flat", cursor="hand2", width=15,
-            command=self.save_settings
-        ).pack(pady=(20, 10))
+        tk.Button(self, text="💾 บันทึก", font=("Arial", 12, "bold"),
+                  command=self.save_settings).pack(pady=15)
 
     def reload_entries_from_config(self):
         """โหลดค่าจาก config.json แล้วใส่กลับลงช่องกรอก"""
         try:
-            with open("config.json", "r", encoding="utf-8") as f:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 cfg = json.load(f)
         except Exception:
-            cfg = db_config
+            cfg = db_config  # fallback ใช้ค่าจากตัวแปรในหน่วยความจำ
 
         # ล้างค่าก่อน
         self.sql_ip_entry.delete(0, tk.END)
@@ -90,26 +73,29 @@ class SettingPage(tk.Frame):
         user = self.sql_user_entry.get().strip()
         pw   = self.sql_pw_entry.get().strip()
         station = self.station_id_entry.get().strip()
-        database = "verp_dev"
-
 
         new_config = {
             "host": host,
             "user": user,
             "password": pw,
-            "database": database,
+            "database": "rpisql",
             "station": station
         }
 
         try:
+            # ทดสอบการเชื่อมต่อชั่วคราวก่อนบันทึก
             test_conn = mysql.connector.connect(
-                host=host, user=user, password=pw, database=database, connect_timeout=5
+                host=host, user=user, password=pw, database="rpisql"
             )
             test_conn.close()
 
+            # ✅ เชื่อมต่อผ่านแล้ว ค่อยอัปเดตและบันทึก
             db_config.update(new_config)
+
             save_config(db_config)
+
             messagebox.showinfo("บันทึก", "✅ บันทึกการตั้งค่าและเชื่อมต่อใหม่เรียบร้อยแล้ว!")
         except Exception as e:
             messagebox.showerror("ผิดพลาด", f"❌ เชื่อมต่อฐานข้อมูลไม่ได้:\n{e}")
+            # โหลดค่าจาก config.json กลับไปในช่อง input
             self.reload_entries_from_config()

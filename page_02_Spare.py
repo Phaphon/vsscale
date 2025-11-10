@@ -1,14 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
-from page_99_Utils import (
-    create_centered_popup,
-    create_password_popup,
-    create_confirm_popup,
-    get_db_connection,
-    get_password,
-    reset_db_connection,
-    AutocompleteCombobox
-    )
+from page_99_Utils import create_centered_popup, create_password_popup, create_confirm_popup, get_db_connection, get_password, reset_db_connection, AutocompleteCombobox
 from vsscale_label import print_label
 
 ROWS_PER_PAGE = 5
@@ -16,47 +8,25 @@ ROWS_PER_PAGE = 5
 class HistoryPage(tk.Frame):
     def __init__(self, master, go_back):
         super().__init__(master)
-        super().__init__(master, bg="#e6f0ff")  # พื้นหลังสีฟ้าอ่อน
+        self.master = master
         self.current_page = 0
         self.headers = ["แก้ไข", "เลขรายการ", "เลขย่อ", "ผู้ผลิต", "สินค้า", "น้ำหนัก", "ปริ้น"]
 
-        style = ttk.Style()
-        style.theme_use("clam")
-        style.configure("TButton",
-            font=("Segoe UI", 10), padding=6,
-            background="#e0e0e0", relief="flat"
-        )
-        style.map("TButton",
-            background=[("active", "#c9e4ff"), ("pressed", "#bcdfff")]
-        )
-        style.configure("TLabel", font=("Segoe UI", 10), background="#f9f9f9")
-        style.configure("TFrame", background="#f9f9f9")
+        tk.Button(self, text="← กลับ", command=go_back).pack(anchor="w", padx=10, pady=10)
+        self.table_frame = tk.Frame(self, bd=2, relief="groove", padx=10, pady=10)
+        self.table_frame.pack(expand=True, fill="both", padx=20, pady=20)
 
-        # ----------------------
-        # ปุ่มกลับ
-        tk.Button(self, text="← กลับ", font=("Segoe UI", 12), bg="#ffffff", fg="#004080", relief="flat",
-                  command=go_back).pack(anchor="w", padx=20, pady=10)        
-        
-        # ตารางกรอบ
-        self.table_frame = tk.Frame(self, bd=2, relief="solid", bg="#ffffff")
-        self.table_frame.pack(expand=True, fill="both", padx=20, pady=(0,20))
-
-
-        # navigation
-        nav_frame = tk.Frame(self, bg="#e6f0ff")
-        nav_frame.pack(pady=5)
-        self.prev_btn = tk.Button(nav_frame, text="←", width=3, font=("Segoe UI", 11, "bold"), bg="#ffffff", fg="#004080",
-                                  relief="raised", command=self.prev_page)
+        nav = tk.Frame(self)
+        nav.pack(pady=10)
+        self.prev_btn = tk.Button(nav, text="←", width=3, command=self.prev_page)
         self.prev_btn.pack(side="left")
-        self.page_label = tk.Label(nav_frame, text="", font=("Segoe UI", 11, "bold"), bg="#e6f0ff", fg="#004080")
+        self.page_label = tk.Label(nav, text="")
         self.page_label.pack(side="left", padx=6)
-        self.next_btn = tk.Button(nav_frame, text="→", width=3, font=("Segoe UI", 11, "bold"), bg="#ffffff", fg="#004080",
-                                  relief="raised", command=self.next_page)
+        self.next_btn = tk.Button(nav, text="→", width=3, command=self.next_page)
         self.next_btn.pack(side="left")
 
-        # ช่องพิมพ์หมายเลขหน้า
-        self.page_entry = tk.Entry(self, width=5, justify="center", font=("Segoe UI", 11),
-                                   bg="#f0f8ff", fg="#004080", bd=1, relief="solid")
+        # ช่องพิมพ์หมายเลขหน้า (อยู่ใต้ตัวเลข)
+        self.page_entry = tk.Entry(self, width=5, justify="center")
         self.page_entry.pack(pady=(0, 10))
         self.page_entry.insert(0, "1")
         self.page_entry.bind("<Return>", self.go_to_page)
@@ -65,23 +35,26 @@ class HistoryPage(tk.Frame):
         self.display_table()
 
     def load_data(self):
+        """โหลดข้อมูลจาก DB และสร้าง mapping สำหรับชื่อสินค้า/ผู้ผลิต"""
         try:
-            conn = reset_db_connection()
+            # รีเฟรช connection ทุกครั้งก่อนโหลดข้อมูล
+            reset_db_connection()
+            conn = get_db_connection()
             cursor = conn.cursor()
 
-            # โหลดสินค้า
+            # โหลดข้อมูลสินค้า
             cursor.execute("SELECT mat_id, mat_label_name FROM materials")
             mats = cursor.fetchall()
             self.mat_map = {m[0]: m[1] for m in mats}
             self.mat_map_reverse = {m[1]: m[0] for m in mats}
 
-            # โหลดผู้ผลิต
+            # โหลดข้อมูลผู้ผลิต
             cursor.execute("SELECT emp_id, emp_name FROM v_emp")
             emps = cursor.fetchall()
             self.emp_map = {e[0]: e[1] for e in emps}
             self.emp_map_reverse = {e[1]: e[0] for e in emps}
 
-            # โหลด pd_item
+            # โหลดข้อมูล pd_item
             cursor.execute("""
                 SELECT
                     pd_item_id,
@@ -122,18 +95,10 @@ class HistoryPage(tk.Frame):
         for w in self.table_frame.winfo_children():
             w.destroy()
 
-        btn_col_width = 8   # ความกว้างปุ่มแก้ไข/ปริ้น
-        data_col_width = 15 # ความกว้างข้อมูล
-
-        # header
         for col, text in enumerate(self.headers):
             tk.Label(
-                self.table_frame, text=text,
-                font=("Segoe UI", 12, "bold"),
-                bg="#cce0ff", fg="#004080",
-                borderwidth=1, relief="solid",
-                width=btn_col_width if col == 0 or col == len(self.headers)-1 else data_col_width,
-                padx=5, pady=12  # เพิ่มความสูงของ header
+                self.table_frame, text=text, font=("Arial", 10, "bold"),
+                borderwidth=1, relief="solid", width=12
             ).grid(row=0, column=col, sticky="nsew")
 
         start = self.current_page * ROWS_PER_PAGE
@@ -141,46 +106,29 @@ class HistoryPage(tk.Frame):
         page_rows = self.data[start:end]
 
         for r, row_data in enumerate(page_rows, start=1):
-            bg_color = "#ffffff" if r % 2 == 1 else "#f2f9ff"
-            for c in range(len(self.headers)):
-                if c == 0:
-                    # ปุ่มแก้ไข
-                    tk.Button(
-                        self.table_frame, text="✎", font=("Segoe UI", 11),
-                        bg="#e6f0ff", fg="#004080", relief="raised",
-                        width=btn_col_width,
-                        command=lambda rd=row_data: self.show_popup(rd)
-                    ).grid(row=r, column=c, sticky="nsew")
-                elif c == len(self.headers)-1:
-                    # ปุ่มปริ้น
-                    tk.Button(
-                        self.table_frame, text="พิมพ์", font=("Segoe UI", 11),
-                        bg="#e6f0ff", fg="#004080", relief="raised",
-                        width=btn_col_width,
-                        command=lambda rd=row_data: self.print_popup(rd)
-                    ).grid(row=r, column=c, sticky="nsew")
-                else:
-                    # ข้อมูล
-                    tk.Label(
-                        self.table_frame, text=row_data[c],
-                        font=("Segoe UI", 11),
-                        bg=bg_color, fg="#004080",
-                        borderwidth=1, relief="solid",
-                        padx=5, pady=6,
-                        width=data_col_width
-                    ).grid(row=r, column=c, sticky="nsew")
+            tk.Button(
+                self.table_frame, text="✎",
+                command=lambda rd=row_data: self.show_popup(rd)
+            ).grid(row=r, column=0, sticky="nsew")
 
-        # ให้ grid ขยายเต็ม
+            for c, value in enumerate(row_data[1:], start=1):
+                tk.Label(
+                    self.table_frame, text=value,
+                    borderwidth=1, relief="solid", width=12
+                ).grid(row=r, column=c, sticky="nsew")
+
+            tk.Button(
+                self.table_frame, text="🖨",
+                command=lambda rd=row_data: self.print_popup(rd)
+            ).grid(row=r, column=len(self.headers)-1, sticky="nsew")
+
         for c in range(len(self.headers)):
             self.table_frame.grid_columnconfigure(c, weight=1)
-        for r in range(ROWS_PER_PAGE + 1):
-            self.table_frame.grid_rowconfigure(r, weight=1)
 
         total_pages = (len(self.data) + ROWS_PER_PAGE - 1) // ROWS_PER_PAGE
         self.page_label.config(text=f"{self.current_page+1}/{total_pages}")
         self.prev_btn.config(state="normal" if self.current_page > 0 else "disabled")
         self.next_btn.config(state="normal" if self.current_page < total_pages-1 else "disabled")
-
 
     def prev_page(self):
         if self.current_page > 0:
@@ -195,51 +143,65 @@ class HistoryPage(tk.Frame):
 
     def show_popup(self, row_data):
         popup = create_centered_popup(self, 500, 300, title="แก้ไข")
-        popup.configure(bg="#fdfdfd")  # Level 3: popup background
 
-        id_var       = tk.StringVar(value=str(row_data[0]))
-        num_var      = tk.StringVar(value=row_data[1])
-        abbr_var     = tk.StringVar(value=row_data[2])
-        producer_var = tk.StringVar(value=row_data[3])
-        product_var  = tk.StringVar(value=row_data[4])
-        weight_var   = tk.StringVar(value=row_data[5])
+        id_var       = tk.StringVar(value=str(row_data[0]))  # pd_item_id
+        num_var      = tk.StringVar(value=row_data[1])       # เลขรายการ
+        abbr_var     = tk.StringVar(value=row_data[2])       # เลขย่อ
+        producer_var = tk.StringVar(value=row_data[3])       # ผู้ผลิตชื่อ
+        product_var  = tk.StringVar(value=row_data[4])       # สินค้าชื่อ
+        weight_var   = tk.StringVar(value=row_data[5])       # น้ำหนัก
 
+        # เตรียมค่ารายการสินค้าและผู้ผลิตสำหรับ Combobox
         product_values  = sorted(self.mat_map.values())
         producer_values = sorted(self.emp_map.values())
 
-        tk.Label(popup, text="แก้ไข", font=("Segoe UI", 14, "bold"), bg="#fdfdfd").pack(pady=6)
-        content = tk.Frame(popup, bg="#fdfdfd")
+        # Layout Frame
+        tk.Label(popup, text="แก้ไข", font=("Arial", 14, "bold")).pack(pady=6)
+        content = tk.Frame(popup)
         content.pack(expand=True, fill="both", padx=16, pady=6)
 
-        tk.Label(content, text="เลขรายการ:", bg="#fdfdfd").grid(row=0, column=0, sticky="e", padx=5, pady=6)
+        # ------------------------
+        # แถว 0: เลขรายการ (Read-only)
+        tk.Label(content, text="เลขรายการ:").grid(row=0, column=0, sticky="e", padx=5, pady=6)
         tk.Entry(content, textvariable=id_var, state="readonly", readonlybackground="white")\
             .grid(row=0, column=1, columnspan=3, sticky="we", padx=5, pady=6)
 
-        tk.Label(content, text="เลขย่อ:", bg="#fdfdfd").grid(row=1, column=0, sticky="e", padx=5, pady=6)
+        # ------------------------
+        # แถว 1: เลขย่อ
+        tk.Label(content, text="เลขย่อ:").grid(row=1, column=0, sticky="e", padx=5, pady=6)
         tk.Entry(content, textvariable=abbr_var).grid(row=1, column=1, sticky="we", padx=5, pady=6)
 
-        tk.Label(content, text="สินค้า:", bg="#fdfdfd").grid(row=1, column=2, sticky="e", padx=5, pady=6)
+        # สินค้า (Dropdown)
+        tk.Label(content, text="สินค้า:").grid(row=1, column=2, sticky="e", padx=5, pady=6)
         product_widget = AutocompleteCombobox(content, values=product_values, textvariable=product_var)
         product_widget.grid(row=1, column=3, sticky="we", padx=5, pady=6)
 
-        tk.Label(content, text="ผู้ผลิต:", bg="#fdfdfd").grid(row=2, column=0, sticky="e", padx=5, pady=6)
+        # ------------------------
+        # แถว 2: ผู้ผลิต
+        tk.Label(content, text="ผู้ผลิต:").grid(row=2, column=0, sticky="e", padx=5, pady=6)
         producer_widget = AutocompleteCombobox(content, values=producer_values, textvariable=producer_var)
         producer_widget.grid(row=2, column=1, sticky="we", padx=5, pady=6)
 
-        tk.Label(content, text="น้ำหนัก:", bg="#fdfdfd").grid(row=2, column=2, sticky="e", padx=5, pady=6)
+        # น้ำหนัก (Read-only)
+        tk.Label(content, text="น้ำหนัก:").grid(row=2, column=2, sticky="e", padx=5, pady=6)
         tk.Entry(content, textvariable=weight_var, state="readonly", readonlybackground="white")\
             .grid(row=2, column=3, sticky="we", padx=5, pady=6)
 
+        # ------------------------
         content.grid_columnconfigure(1, weight=1)
         content.grid_columnconfigure(3, weight=1)
 
+        # ------------------------
+        # Save function
         def confirm_save():
             def do_save():
                 try:
                     conn = get_db_connection()
                     cursor = conn.cursor()
+
                     emp_id = self.emp_map_reverse.get(producer_var.get(), producer_var.get())
                     mat_id = self.mat_map_reverse.get(product_var.get(), product_var.get())
+
                     cursor.execute("""
                         UPDATE pd_item
                         SET pd_item_number=%s, pd_item_remark=%s, emp_id=%s, result_id=%s
@@ -252,6 +214,7 @@ class HistoryPage(tk.Frame):
                     cursor.close()
                     conn.close()
 
+                # อัปเดตตาราง
                 row_data[1] = num_var.get()
                 row_data[2] = abbr_var.get()
                 row_data[3] = producer_var.get()
@@ -266,21 +229,41 @@ class HistoryPage(tk.Frame):
                 confirm_callback=do_save
             )
 
-        btns = tk.Frame(popup, bg="#fdfdfd")
+        # ------------------------
+        btns = tk.Frame(popup)
         btns.pack(pady=10)
-        tk.Button(btns, text="❌ ยกเลิก", width=10, command=popup.destroy,
-                  bg="#e0e0e0", relief="flat", activebackground="#d0e7ff").pack(side="left", padx=8)
-        tk.Button(btns, text="✔ บันทึก", width=10, command=confirm_save,
-                  bg="#e0e0e0", relief="flat", activebackground="#d0e7ff").pack(side="left", padx=8)
+        tk.Button(btns, text="❌ ยกเลิก", width=10, command=popup.destroy).pack(side="left", padx=8)
+        tk.Button(btns, text="✔ บันทึก", width=10, command=confirm_save).pack(side="left", padx=8)
 
         popup.show()
         popup.transient(self)
         popup.grab_set()
 
+    # def print_popup(self, row_data):
+    #     """แสดง confirm popup ก่อนปริ้น"""
+    #     def do_print():
+    #         print_label(
+    #             port="/dev/ttySC1",
+    #             baud=115200,
+    #             header_text="header_747_270.bmp",
+    #             table_text="table_vj_mono_2_270.bmp",
+    #             product_name=row_data[3],
+    #             pd_item_number=row_data[1],
+    #             pd_date="2099-99-99",
+    #             mat_size="Size",
+    #             mat_grade="Grade",
+    #             pd_weight=row_data[5],
+    #             pd_item_remark="",
+    #         )
+
+    #     create_confirm_popup(self, message=f"ยืนยันการพิมพ์ป้าย {row_data[3]} ?", confirm_callback=do_print)
+
     def print_popup(self, row_data):
+        """แสดง confirm popup ก่อนปริ้น"""
         def do_print():
             pd_item_id = row_data[0]
             extra = self.get_print_detail_from_verp(pd_item_id)
+
             print_label(
                 port="/dev/ttySC1",
                 baud=115200,
@@ -298,9 +281,11 @@ class HistoryPage(tk.Frame):
         create_confirm_popup(self, message=f"ยืนยันการพิมพ์ป้าย {row_data[3]} ?", confirm_callback=do_print)
 
     def get_print_detail_from_verp(self, pd_item_id):
+        """Query verp server เพื่อดึงข้อมูล pd_date, mat_size, mat_grade"""
         try:
-            conn = get_db_connection()
+            conn = get_db_connection()  # ไม่ต้องใส่ server="verp"
             cursor = conn.cursor()
+
             cursor.execute("""
                 SELECT 
                     DATE_FORMAT(pd.pd_pub_date, '%d/%m/%Y') AS pd_date,
@@ -313,9 +298,15 @@ class HistoryPage(tk.Frame):
                 LEFT JOIN tisi_grade ON tisi_grade.tisi_grade_id = materials.tisi_grade_id
                 WHERE pd_item.pd_item_id = %s
             """, (pd_item_id,))
+
             row = cursor.fetchone()
+
             if row:
-                return {"pd_date": row[0] or "-", "mat_size": row[1] or "-", "mat_grade": row[2] or "-"}
+                return {
+                    "pd_date": row[0] or "-",
+                    "mat_size": row[1] or "-",
+                    "mat_grade": row[2] or "-",
+                }
             else:
                 return {"pd_date": "-", "mat_size": "-", "mat_grade": "-"}
         except Exception as e:
@@ -329,9 +320,11 @@ class HistoryPage(tk.Frame):
                 pass
 
     def go_to_page(self, event=None):
+        """กระโดดไปยังหน้าที่ผู้ใช้พิมพ์"""
         try:
             total_pages = (len(self.data) + ROWS_PER_PAGE - 1) // ROWS_PER_PAGE
             target_page = int(self.page_entry.get()) - 1
+
             if 0 <= target_page < total_pages:
                 self.current_page = target_page
                 self.display_table()

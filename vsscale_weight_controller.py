@@ -2,7 +2,7 @@ import random
 import ctypes
 
 # ===== CONFIG =====
-USE_MOCK = True   # 👈 เปลี่ยนเป็น False ถ้ามีเครื่องจริง
+USE_MOCK = False   # 👈 เปลี่ยนเป็น False ถ้ามีเครื่องจริง
 RTU_PORT = "/dev/ttySC0"
 RTU_BAUD = 9600
 RTU_STOPBITS = 1
@@ -35,7 +35,7 @@ if not USE_MOCK:
             print(f"❌ Read failed at address {address}: {rr}")
             return None
         ret = ctypes.c_int16(rr.registers[0]).value
-        print(f"✅ Read success at address {address}: {ret}")
+        #print(f"✅ Read success at address {address}: {ret}")
         return ret
 
     def _set_zero():
