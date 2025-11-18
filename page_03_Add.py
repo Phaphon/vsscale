@@ -110,7 +110,8 @@ class AddPage(tk.Frame):
         self.product_entry = AutocompleteCombobox(
             form_frame,
             values=sorted(self.mat_map.values()) if self.mat_map else [],
-            textvariable=self.product_var
+            textvariable=self.product_var,entry_font=self.FONT_ENTRY,
+            listbox_font=self.FONT_ENTRY
         )
         self.product_entry.grid(row=0, column=3, sticky="we", padx=5, pady=8)
 
@@ -119,7 +120,8 @@ class AddPage(tk.Frame):
         self.producer_entry = AutocompleteCombobox(
             form_frame,
             values=sorted(self.emp_map.values()) if self.emp_map else [],
-            textvariable=self.producer_var
+            textvariable=self.producer_var,entry_font=self.FONT_ENTRY,
+            listbox_font=self.FONT_ENTRY
         )
         self.producer_entry.grid(row=1, column=1, sticky="we", padx=5, pady=8)
 
