@@ -13,7 +13,7 @@ class HomePage(tk.Frame):
 
         # 🔹 สไตล์ปุ่ม
         button_style = {
-            "font": ("Segoe UI", 18, "bold"),
+            "font": ("Segoe UI", 36, "bold"),
             "width": 12,
             "height": 2,
             "bg": "#b5dcff",

@@ -4,6 +4,29 @@ import json, os
 
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "config.json")
 
+# page_00_style.py
+
+GLOBAL_STYLE = {
+    "bg_main": "#e6f0ff",      # สีพื้นหลังของหน้าใหญ่ (Page)
+    "bg_frame": "#ffffff",     # สีพื้นหลังเฟรม
+    "bg_header": "#cce0ff",    # สี header ตาราง
+    "bg_row_even": "#ffffff",
+    "bg_row_odd": "#f2f9ff",
+
+    "fg_text": "#004080",
+    "fg_header": "#004080",
+
+    "font_normal": ("Segoe UI", 14),
+    "font_small": ("Segoe UI", 12),
+    "font_bold": ("Segoe UI", 14, "bold"),
+
+    "button_bg": "#ffffff",
+    "button_fg": "#004080",
+    "button_active": "#c9e4ff",
+
+    "entry_bg": "#f0f8ff",
+}
+
 # ===== Popup utilities (themed) =====
 def create_centered_popup(master, width, height, title=""):
     popup = tk.Toplevel(master)
@@ -206,14 +229,6 @@ def get_password(which):
         return db_config.get("history_password", "")
     return ""
 
-#def get_db_connection():
-#    """สร้างหรือดึง connection"""
-#    global connection
-#    if connection is None or not connection.is_connected():
-#        conn_cfg = {k: db_config[k] for k in ["host", "user", "password", "database"]}
-#        connection = mysql.connector.connect(**conn_cfg)
-#    return connection
-
 def get_db_connection():
     global connection
     if connection is None or not connection.is_connected():
@@ -231,7 +246,6 @@ def get_db_connection():
             print(f"❌ Database connection error: {e}")
             connection = None
     return connection
-
 
 def reset_db_connection():
     """ปิดและเปิดการเชื่อมต่อใหม่"""
@@ -252,61 +266,92 @@ load_config()
 from tkinter import ttk
 
 class AutocompleteCombobox(ttk.Frame):
-    """Entry + ปุ่ม dropdown + autocomplete listbox overlay (reusable)"""
-    def __init__(self, master=None, values=None, textvariable=None, listbox_maxheight=5, **kwargs):
+    """
+    Entry + dropdown listbox overlay.
+    Usage:
+      ac = AutocompleteCombobox(parent, values=list_of_strings, textvariable=tv,
+                                entry_font=("Segoe UI",12), listbox_font=("Segoe UI",12))
+    """
+    def __init__(self, master=None, values=None, textvariable=None,
+                 listbox_maxheight=6, entry_font=None, listbox_font=None, **kwargs):
+        # IMPORTANT: don't pass font kwargs to the Frame itself
         super().__init__(master, **kwargs)
+
         self._values = list(values or [])
         self._filtered_values = self._values.copy()
         self.var = textvariable or tk.StringVar()
 
-        # ✅ ใช้ grid layout แทน pack
-        self.columnconfigure(0, weight=1)  # ให้ entry ขยายเต็มที่
+        self._listbox_maxheight = listbox_maxheight
+        self.entry_font = entry_font
+        self.listbox_font = listbox_font
+
+        # layout
+        self.columnconfigure(0, weight=1)
         self.columnconfigure(1, weight=0)
 
-        # Entry
+        # Entry (ttk.Entry)
         self.entry = ttk.Entry(self, textvariable=self.var)
-        self.entry.grid(row=0, column=0, sticky="nsew")
+        self.entry.grid(row=0, column=0, sticky="nsew", padx=(0,2))
 
-        # Dropdown button
+        if self.entry_font:
+            try:
+                self.entry.configure(font=self.entry_font)
+            except Exception:
+                pass
+
+        # dropdown button
         self.btn = ttk.Button(self, text="▼", width=2, command=self._toggle_listbox)
-        self.btn.grid(row=0, column=1, sticky="ns", padx=(2, 0))
+        self.btn.grid(row=0, column=1, sticky="ns")
 
-        # overlay listbox (Toplevel)
+        # overlay listbox
         self._toplevel = None
         self._listbox = None
-        self._listbox_maxheight = listbox_maxheight
 
         # events
         self.var.trace_add("write", self._on_var_change)
-        self.entry.bind("<Down>", self._on_down)      # go to listbox
-        self.entry.bind("<Return>", self._on_return)  # accept
+        self.entry.bind("<Down>", self._on_down)
+        self.entry.bind("<Return>", self._on_return)
         self.entry.bind("<Escape>", self._hide_listbox)
-        # do NOT force focus in _on_var_change (prevents focus loss while typing)
 
-        # hide when clicking elsewhere
-        self.entry.bind("<FocusOut>", lambda e: self.after(120, self._hide_listbox))
-        # ✅ ตรวจจับการคลิกนอก combobox หรือ dropdown
-        self.bind_all("<Button-1>", self._on_click_outside, add="+")
+        # Only hide when clicking truly outside: global click handler with safe checks
+        # Use the toplevel of entry to bind once (avoid duplicate binds if many widgets)
+        try:
+            top = self.entry.winfo_toplevel()
+            top.bind_all("<Button-1>", self._on_click_outside, add="+")
+        except Exception:
+            # fallback no global bind
+            pass
 
-    # update source dataset (optional)
+        # Keep a flag so we don't hide while interacting with the listbox
+        self._ignore_next_focus_loss = False
+
     def set_values(self, values):
         self._values = list(values or [])
         self._filtered_values = self._values.copy()
 
+    def set_fonts(self, entry_font=None, listbox_font=None):
+        self.entry_font = entry_font or self.entry_font
+        self.listbox_font = listbox_font or self.listbox_font
+        if self.entry_font:
+            try:
+                self.entry.configure(font=self.entry_font)
+            except Exception:
+                pass
+        if self._listbox and self.listbox_font:
+            try:
+                self._listbox.configure(font=self.listbox_font)
+            except Exception:
+                pass
+
     def _toggle_listbox(self):
-        # toggle dropdown visibility
         if self._toplevel and tk.Toplevel.winfo_exists(self._toplevel):
             self._hide_listbox()
             return
 
-        # show all values
         self._filtered_values = self._values
         if self._filtered_values:
             self._show_listbox()
-
-            # ✅ บังคับ focus กลับที่ entry เพื่อให้ on_click_outside ทำงานได้
             self.entry.focus_set()
-
 
     def _on_var_change(self, *args):
         text = (self.var.get() or "").lower()
@@ -325,42 +370,57 @@ class AutocompleteCombobox(ttk.Frame):
             self._hide_listbox()
             return
 
-        # create toplevel once
         if self._toplevel is None or not tk.Toplevel.winfo_exists(self._toplevel):
             parent_top = self.entry.winfo_toplevel()
+            # Create overlay toplevel owned by same root — this helps with focus behavior
             self._toplevel = tk.Toplevel(parent_top)
             self._toplevel.wm_overrideredirect(True)
-            # don't grab focus here
-            self._listbox = tk.Listbox(self._toplevel)
+            # do NOT grab focus here
+            self._listbox = tk.Listbox(self._toplevel, activestyle="dotbox")
+            # set fonts if provided
+            if self.listbox_font:
+                try:
+                    self._listbox.configure(font=self.listbox_font)
+                except Exception:
+                    pass
             self._listbox.pack(fill="both", expand=True)
+
             self._listbox.bind("<<ListboxSelect>>", self._on_listbox_select)
             self._listbox.bind("<Return>", self._on_return)
-            self._listbox.bind("<FocusOut>", lambda e: self.after(120, self._hide_listbox))
 
-        # fill data
+            # mouse wheel on listbox (cross-platform)
+            self._listbox.bind("<MouseWheel>", lambda e: self._listbox.yview_scroll(int(-1*(e.delta/120)), "units"))
+            self._listbox.bind("<Button-4>", lambda e: self._listbox.yview_scroll(-1, "units"))
+            self._listbox.bind("<Button-5>", lambda e: self._listbox.yview_scroll(1, "units"))
+
+            # clicking inside listbox should not hide it
+            self._listbox.bind("<Button-1>", lambda e: None)
+
+        # fill listbox
         self._listbox.delete(0, tk.END)
         for v in self._filtered_values:
             self._listbox.insert(tk.END, v)
 
-        # size & place under entry
+        # place directly under entry
         x = self.entry.winfo_rootx()
         y = self.entry.winfo_rooty() + self.entry.winfo_height()
-        width = max(self.entry.winfo_width(), 100)
-        # compute height limited by number of visible items
+        width = max(self.entry.winfo_width(), 140)
         visible = min(self._listbox_maxheight, len(self._filtered_values))
-        # estimate item height:
-        item_h = self._listbox.winfo_reqheight() // max(1, self._listbox.size()) if self._listbox.size() else 20
-        # safer: set height via geometry using listbox's requested height for visible items
         self._listbox.config(height=visible)
-        self._toplevel.geometry(f"{width}x{self._listbox.winfo_reqheight()}+{x}+{y}")
+        # geometry height: use requested height of listbox
+        h = self._listbox.winfo_reqheight()
+        try:
+            self._toplevel.geometry(f"{width}x{h}+{x}+{y}")
+        except Exception:
+            # fallback: simple placement
+            self._toplevel.geometry(f"+{x}+{y}")
         self._toplevel.deiconify()
-        # Do NOT call focus_force() here — keeps typing smooth.
 
     def _hide_listbox(self, event=None):
         if self._toplevel and tk.Toplevel.winfo_exists(self._toplevel):
             try:
                 self._toplevel.destroy()
-            except:
+            except Exception:
                 pass
         self._toplevel = None
         self._listbox = None
@@ -372,24 +432,22 @@ class AutocompleteCombobox(ttk.Frame):
         if sel:
             val = self._listbox.get(sel[0])
             self.var.set(val)
-            # put cursor to end in entry
             self.entry.icursor(tk.END)
+        # keep it visible until user confirms (we choose to hide after selection to mimic combobox)
         self._hide_listbox()
 
     def _on_down(self, event):
-        # move focus to listbox when available
         if self._listbox:
             try:
                 self._listbox.focus_set()
                 self._listbox.selection_clear(0, tk.END)
                 self._listbox.selection_set(0)
                 self._listbox.activate(0)
-            except:
+            except Exception:
                 pass
             return "break"
 
     def _on_return(self, event):
-        # if listbox has selection, use it; else use first filtered value
         if self._listbox:
             sel = self._listbox.curselection()
             if sel:
@@ -404,18 +462,17 @@ class AutocompleteCombobox(ttk.Frame):
         return "break"
 
     def _on_click_outside(self, event):
-        """Hide dropdown when clicking outside entry or dropdown"""
+        # event.x_root / y_root are global screen coords
         if not self._toplevel:
             return
 
-        # get widget clicked
         widget = event.widget
 
-        # check if click is inside entry, button, or listbox
+        # if click is inside entry/button/listbox -> keep open
         if widget in (self.entry, self.btn, self._listbox):
             return
 
-        # check if click is inside toplevel dropdown area
+        # click inside the overlay listbox area -> keep open
         if self._toplevel and tk.Toplevel.winfo_exists(self._toplevel):
             x1 = self._toplevel.winfo_rootx()
             y1 = self._toplevel.winfo_rooty()
@@ -424,5 +481,17 @@ class AutocompleteCombobox(ttk.Frame):
             if x1 <= event.x_root <= x2 and y1 <= event.y_root <= y2:
                 return
 
-        # otherwise, clicked outside → hide
+        # click inside the parent Toplevel (e.g. popup) -> do not close
+        try:
+            parent_top = self.entry.winfo_toplevel()
+            px1 = parent_top.winfo_rootx()
+            py1 = parent_top.winfo_rooty()
+            px2 = px1 + parent_top.winfo_width()
+            py2 = py1 + parent_top.winfo_height()
+            if px1 <= event.x_root <= px2 and py1 <= event.y_root <= py2:
+                return
+        except Exception:
+            pass
+
+        # otherwise close
         self._hide_listbox()

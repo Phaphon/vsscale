@@ -13,32 +13,70 @@ from page_99_Utils import (
 class AddPage(tk.Frame):
     def __init__(self, master, go_back):
         super().__init__(master, bg="#f4faff")
+        # ----------------------------------
+        # GLOBAL STYLE CONFIG
+        # ----------------------------------
+        self.FONT_HEADER = ("Segoe UI", 22, "bold")
+        self.FONT_LABEL = ("Segoe UI", 18, "bold")
+        self.FONT_ENTRY = ("Segoe UI", 18)
+        self.FONT_BUTTON = ("Segoe UI", 18, "bold")
 
+        self.COLOR_BG = "#f4faff"
+        self.COLOR_WHITE = "white"
+        self.COLOR_TEXT = "#003366"
+
+        self.LABEL_STYLE = {
+            "bg": self.COLOR_WHITE,
+            "fg": self.COLOR_TEXT,
+            "font": self.FONT_LABEL
+        }
+
+        self.ENTRY_STYLE = {
+            "font": self.FONT_ENTRY,
+            "bd": 1,
+            "relief": "solid"
+        }
+
+        self.BUTTON_STYLE = {
+            "font": self.FONT_BUTTON,
+            "bd": 0,
+            "relief": "flat",
+            "cursor": "hand2",
+            "width": 12,
+            "height": 2
+        }
+        
         from vsscale_weight_controller import read_weight, set_zero
         self.read_weight = read_weight
         self.set_zero = set_zero
-
-        # 🔹 หัวข้อหลัก
+        
+        # ---------------- UI ----------------
+        # หัวข้อหลัก
         tk.Label(
-            self, text="➕ เพิ่มรายการ", font=("Segoe UI", 22, "bold"),
-            bg="#f4faff", fg="#003366"
+            self, text="➕ เพิ่มรายการ", font=self.FONT_HEADER,
+            bg=self.COLOR_BG, fg=self.COLOR_TEXT
         ).pack(pady=(20, 5))
 
-        # 🔹 กรอบเนื้อหา
-        content = tk.Frame(self, bg="white", bd=1, relief="solid")
+        # กรอบเนื้อหา
+        content = tk.Frame(self, bg=self.COLOR_WHITE, bd=1, relief="solid")
         content.pack(expand=True, fill="both", padx=40, pady=(5, 40))
 
         # === สร้างฟอร์มอยู่ตรงกลางของ content ===
-        form_frame = tk.Frame(content, bg="white")
+        form_frame = tk.Frame(content, bg=self.COLOR_WHITE)
         form_frame.place(relx=0.5, rely=0.5, anchor="center")
         form_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
         # --- ตัวแปร ---
+        # weight_var เก็บค่าจริง (ใช้กับ DB)
         self.abbr_var = tk.StringVar()
         self.product_var = tk.StringVar()
         self.producer_var = tk.StringVar()
         self.weight_var = tk.StringVar(value=str(self.read_weight()))
-
+        # weight_display_var สำหรับแสดงบน UI เท่านั้น (จำนวนเต็ม)
+        self.weight_display_var = tk.StringVar()
+        self._update_weight_display_from_var()  # ตั้งค่าเริ่มต้นให้ display เป็นจำนวนเต็ม
+        
+        
         # --- โหลดข้อมูลจาก DB ---
         self.mat_map, self.mat_map_reverse = {}, {}
         self.emp_map, self.emp_map_reverse = {}, {}
@@ -63,35 +101,32 @@ class AddPage(tk.Frame):
             if cur: cur.close()
             if conn: conn.close()
 
-        # --- Label + Input Styling ---
-        label_style = {"bg": "white", "fg": "#003366", "font": ("Segoe UI", 12, "bold")}
-        entry_style = {"font": ("Segoe UI", 12), "bd": 1, "relief": "solid"}
+        # --- Label + Input Styling (ใช้จาก config ด้านบน) ---
+        # แถว 1
+        tk.Label(form_frame, text="เลขย่อ:", **self.LABEL_STYLE).grid(row=0, column=0, sticky="e", padx=5, pady=8)
+        tk.Entry(form_frame, textvariable=self.abbr_var, **self.ENTRY_STYLE).grid(row=0, column=1, sticky="we", padx=5, pady=8)
 
-       # แถว 1
-        tk.Label(form_frame, text="เลขย่อ:", **label_style).grid(row=0, column=0, sticky="e", padx=5, pady=8)
-        tk.Entry(form_frame, textvariable=self.abbr_var, **entry_style).grid(row=0, column=1, sticky="we", padx=5, pady=8)
-
-        tk.Label(form_frame, text="สินค้า:", **label_style).grid(row=0, column=2, sticky="e", padx=5, pady=8)
+        tk.Label(form_frame, text="สินค้า:", **self.LABEL_STYLE).grid(row=0, column=2, sticky="e", padx=5, pady=8)
         self.product_entry = AutocompleteCombobox(
             form_frame,
-            values=sorted(self.mat_map.values()),
+            values=sorted(self.mat_map.values()) if self.mat_map else [],
             textvariable=self.product_var
         )
         self.product_entry.grid(row=0, column=3, sticky="we", padx=5, pady=8)
 
         # แถว 2
-        tk.Label(form_frame, text="ผู้ผลิต:", **label_style).grid(row=1, column=0, sticky="e", padx=5, pady=8)
+        tk.Label(form_frame, text="ผู้ผลิต:", **self.LABEL_STYLE).grid(row=1, column=0, sticky="e", padx=5, pady=8)
         self.producer_entry = AutocompleteCombobox(
             form_frame,
-            values=sorted(self.emp_map.values()),
+            values=sorted(self.emp_map.values()) if self.emp_map else [],
             textvariable=self.producer_var
         )
         self.producer_entry.grid(row=1, column=1, sticky="we", padx=5, pady=8)
 
-        tk.Label(form_frame, text="น้ำหนัก:", **label_style).grid(row=1, column=2, sticky="e", padx=5, pady=8)
+        tk.Label(form_frame, text="น้ำหนัก:", **self.LABEL_STYLE).grid(row=1, column=2, sticky="e", padx=5, pady=8)
         tk.Entry(
-            form_frame, textvariable=self.weight_var, state="readonly",
-            readonlybackground="white", **entry_style
+            form_frame, textvariable=self.weight_display_var, state="readonly",
+            readonlybackground=self.COLOR_WHITE, **self.ENTRY_STYLE
         ).grid(row=1, column=3, sticky="we", padx=5, pady=8)
 
 
@@ -100,23 +135,14 @@ class AddPage(tk.Frame):
             self.reset_inputs()
             go_back()
 
-        btn_style = {
-            "font": ("Segoe UI", 12, "bold"),
-            "bd": 0,
-            "relief": "flat",
-            "cursor": "hand2",
-            "width": 12,
-            "height": 2
-        }
-
-        btn_frame = tk.Frame(form_frame, bg="white")
+        btn_frame = tk.Frame(form_frame, bg=self.COLOR_WHITE)
         btn_frame.grid(row=2, column=0, columnspan=4, pady=25)  # span ครอบทุกคอลัมน์เพื่อจัดกึ่งกลาง
 
         # ปุ่มปรับศูนย์
         btn_zero = tk.Button(
             btn_frame, text="⚖ ปรับศูนย์", command=self.zero_weight,
-            bg="#b5dcff", fg="#003366", activebackground="#d3ebff",
-            **btn_style
+            bg="#b5dcff", fg=self.COLOR_TEXT, activebackground="#d3ebff",
+            **self.BUTTON_STYLE
         )
         btn_zero.pack(side="left", padx=(0, 40))  # ช่องว่างมากระหว่างปรับศูนย์กับยกเลิก
 
@@ -124,7 +150,7 @@ class AddPage(tk.Frame):
         btn_cancel = tk.Button(
             btn_frame, text="❌ ยกเลิก", command=go_back_action,
             bg="#ffb5b5", fg="#003366", activebackground="#ffd6d6",
-            **btn_style
+            **self.BUTTON_STYLE
         )
         btn_cancel.pack(side="left", padx=(35, 15))  # ช่องว่างเล็กระหว่างยกเลิกกับบันทึก
 
@@ -132,9 +158,23 @@ class AddPage(tk.Frame):
         btn_save = tk.Button(
             btn_frame, text="✔ บันทึก", command=self.confirm_save,
             bg="#b5dcff", fg="#003366", activebackground="#d3ebff",
-            **btn_style
+            **self.BUTTON_STYLE
         )
         btn_save.pack(side="left", padx=(20, 0))
+
+    # ------------------------------- HELPERS ------------------------------- #
+    def _update_weight_display_from_var(self):
+        """
+        แปลง self.weight_var (ค่าจริง) -> self.weight_display_var (จำนวนเต็มสำหรับแสดง)
+        โดยไม่แก้ค่า self.weight_var
+        """
+        raw = self.weight_var.get()
+        try:
+            # แปลงเป็น float แล้วตัดทศนิยมด้วย int() (truncate)
+            display = str(int(float(raw)))
+        except Exception:
+            display = raw  # ถ้าไม่ใช่ตัวเลข ให้แสดงเดิม
+        self.weight_display_var.set(display)
 
     # ------------------------------- LOGIC ------------------------------- #
 
@@ -143,6 +183,7 @@ class AddPage(tk.Frame):
         self.product_var.set("")
         self.producer_var.set("")
         self.weight_var.set(str(self.read_weight()))
+        self._update_weight_display_from_var()
         if hasattr(self.product_entry, "_hide_listbox"): self.product_entry._hide_listbox()
         if hasattr(self.producer_entry, "_hide_listbox"): self.producer_entry._hide_listbox()
 
@@ -151,6 +192,7 @@ class AddPage(tk.Frame):
         w = self.read_weight()
         if w is not None:
             self.weight_var.set(str(w))
+            self._update_weight_display_from_var()
 
     def confirm_save(self):
         create_confirm_popup(
@@ -245,7 +287,6 @@ class AddPage(tk.Frame):
             cur.close()
             conn.close()
 
-
     # ------------------------------- LOOP ------------------------------- #
 
     def start_weight_loop(self):
@@ -262,6 +303,7 @@ class AddPage(tk.Frame):
             w = self.read_weight()
             if w is not None:
                 self.weight_var.set(str(w))
+                self._update_weight_display_from_var()
         except Exception as e:
             print("❌ อ่านน้ำหนักล้มเหลว:", e)
         finally:

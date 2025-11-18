@@ -17,8 +17,7 @@ ROWS_PER_PAGE = 5
 
 class HistoryPage(tk.Frame):
     def __init__(self, master, go_back):
-        super().__init__(master)
-        super().__init__(master, bg=GS["bg_main"])  # พื้นหลังสีฟ้าอ่อน
+        super().__init__(master, bg=GS["bg_main"])
         self.current_page = 0
         self.headers = ["แก้ไข", "เลขรายการ", "เลขย่อ", "ผู้ผลิต", "สินค้า", "น้ำหนัก", "ปริ้น"]
 
@@ -51,9 +50,11 @@ class HistoryPage(tk.Frame):
                                   bg=GS["button_bg"], fg=GS["button_fg"],
                                   relief="raised", command=self.prev_page)
         self.prev_btn.pack(side="left")
+
         self.page_label = tk.Label(nav_frame, text="", font=GS["font_bold"],
                                    bg=GS["bg_main"], fg=GS["fg_text"])
         self.page_label.pack(side="left", padx=6)
+
         self.next_btn = tk.Button(nav_frame, text="→", width=3, font=GS["font_bold"],
                                   bg=GS["button_bg"], fg=GS["button_fg"],
                                   relief="raised", command=self.next_page)
@@ -127,36 +128,19 @@ class HistoryPage(tk.Frame):
         for w in self.table_frame.winfo_children():
             w.destroy()
 
-        btn_col_width = 8   # ความกว้างปุ่มแก้ไข/ปริ้น
-        data_col_width = 15 # ความกว้างข้อมูล
-        # ความกว้างคอลัมน์เฉพาะเจาะจง
-        column_widths = {
-            0: btn_col_width,     # แก้ไข
-            1: data_col_width,    # เลขรายการ
-            2: data_col_width,    # เลขย่อ
-            3: int(data_col_width * 0.6),  # ผู้ผลิต 60%
-            4: int(data_col_width * 1.4),  # สินค้า เพิ่มพื้นที่จากผู้ผลิต
-            5: data_col_width,    # น้ำหนัก
-            6: btn_col_width      # ปริ้น
-        }
+        btn_col_width = 8
+        data_col_width = 15
 
         # header
         for col, text in enumerate(self.headers):
-            # ใช้ width เฉพาะคอลัมน์ ถ้าไม่มีก็ใช้ default
-            if col == 0 or col == len(self.headers)-1:
-                width = btn_col_width
-            else:
-                width = column_widths.get(col, data_col_width)
-
             tk.Label(
                 self.table_frame, text=text,
                 font=GS["font_bold"],
                 bg=GS["bg_header"], fg=GS["fg_header"],
                 borderwidth=1, relief="solid",
-                width = column_widths.get(col, data_col_width),
+                width=column_widths.get(col, data_col_width),
                 padx=5, pady=12
             ).grid(row=0, column=col, sticky="nsew")
-
 
         start = self.current_page * ROWS_PER_PAGE
         end = start + ROWS_PER_PAGE
@@ -164,7 +148,9 @@ class HistoryPage(tk.Frame):
 
         for r, row_data in enumerate(page_rows, start=1):
             bg_color = GS["bg_row_odd"] if r % 2 == 1 else GS["bg_row_even"]
+
             for c in range(len(self.headers)):
+
                 if c == 0:
                     # ปุ่มแก้ไข
                     tk.Button(
@@ -174,6 +160,7 @@ class HistoryPage(tk.Frame):
                         relief="raised", width=btn_col_width,
                         command=lambda rd=row_data: self.show_popup(rd)
                     ).grid(row=r, column=c, sticky="nsew")
+
                 elif c == len(self.headers)-1:
                     # ปุ่มปริ้น
                     tk.Button(
@@ -185,12 +172,12 @@ class HistoryPage(tk.Frame):
                     ).grid(row=r, column=c, sticky="nsew")
 
                 else:
-                    # ถ้าเป็นคอลัมน์น้ำหนัก (index 5) → แสดงเป็นจำนวนเต็ม
+                    # คอลัมน์น้ำหนัก → แปลงเป็นจำนวนเต็ม
                     if c == 5:
                         try:
-                            display_value = str(int(float(row_data[c])))   # แปลงเฉพาะการแสดงผล
+                            display_value = str(int(float(row_data[c])))
                         except:
-                            display_value = row_data[c]  # ถ้าแปลงไม่ได้ ให้แสดงตามเดิม
+                            display_value = row_data[c]
                     else:
                         display_value = row_data[c]
 
@@ -203,8 +190,6 @@ class HistoryPage(tk.Frame):
                         width=data_col_width
                     ).grid(row=r, column=c, sticky="nsew")
 
-
-        # ให้ grid ขยายเต็ม
         for c in range(len(self.headers)):
             self.table_frame.grid_columnconfigure(c, weight=1)
         for r in range(ROWS_PER_PAGE + 1):
@@ -214,7 +199,6 @@ class HistoryPage(tk.Frame):
         self.page_label.config(text=f"{self.current_page+1}/{total_pages}")
         self.prev_btn.config(state="normal" if self.current_page > 0 else "disabled")
         self.next_btn.config(state="normal" if self.current_page < total_pages-1 else "disabled")
-
 
     def prev_page(self):
         if self.current_page > 0:
@@ -308,7 +292,7 @@ class HistoryPage(tk.Frame):
         popup.show()
         popup.transient(self)
         popup.grab_set()
-
+        
     def print_popup(self, row_data):
         def do_print():
             pd_item_id = row_data[0]
