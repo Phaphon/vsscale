@@ -2,7 +2,7 @@ import random
 import ctypes
 
 # ===== CONFIG =====
-USE_MOCK = False   # 👈 เปลี่ยนเป็น False ถ้ามีเครื่องจริง
+USE_MOCK = True   # 👈 เปลี่ยนเป็น False ถ้ามีเครื่องจริง
 RTU_PORT = "/dev/ttySC0"
 RTU_BAUD = 9600
 RTU_STOPBITS = 1

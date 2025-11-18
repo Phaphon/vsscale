@@ -19,6 +19,8 @@ GLOBAL_STYLE = {
     "font_normal": ("Segoe UI", 14),
     "font_small": ("Segoe UI", 12),
     "font_bold": ("Segoe UI", 14, "bold"),
+    "FONT_WEIGHT_LABEL": ("Segoe UI", 28, "bold"),
+    "FONT_WEIGHT_VALUE": ("Segoe UI", 32),
 
     "button_bg": "#ffffff",
     "button_fg": "#004080",
@@ -32,7 +34,7 @@ def create_centered_popup(master, width, height, title=""):
     popup = tk.Toplevel(master)
     popup.withdraw()
     popup.title(title)
-    popup.configure(bg="#f4faff")  # 💠 พื้นหลังอ่อนฟ้า
+    popup.configure(bg=GLOBAL_STYLE["bg_main"])  # 💠 พื้นหลังอ่อนฟ้า
     popup.protocol("WM_DELETE_WINDOW", popup.destroy)
 
     def show():
@@ -166,6 +168,23 @@ def create_password_popup(parent, correct_password, message="กรุณาใ�
 
     return popup
 
+def show_info_popup(parent, title="แจ้งเตือน", message=""):
+    popup = tk.Toplevel(parent)
+    popup.title(title)
+    popup.geometry("360x180")
+    popup.configure(bg="white")
+    popup.grab_set()  # บังคับให้กด popup ก่อน
+
+    tk.Label(
+        popup, text=message, font=(GLOBAL_STYLE["font_normal"]),
+        bg="white", fg="#003366", wraplength=320
+    ).pack(pady=25)
+
+    tk.Button(
+        popup, text="ปิด", font=(GLOBAL_STYLE["font_bold"]),
+        width=10, bg="#b5dcff", fg="#003366",
+        command=popup.destroy
+    ).pack(pady=5)
 
 # ===== ค่าตั้งต้นแบบปลอดภัย (ไม่ใส่รหัสผ่านจริง) =====
 DEFAULT_CONFIG = {
@@ -325,6 +344,7 @@ class AutocompleteCombobox(ttk.Frame):
         # Keep a flag so we don't hide while interacting with the listbox
         self._ignore_next_focus_loss = False
 
+
     def set_values(self, values):
         self._values = list(values or [])
         self._filtered_values = self._values.copy()
@@ -388,6 +408,10 @@ class AutocompleteCombobox(ttk.Frame):
             self._listbox.bind("<<ListboxSelect>>", self._on_listbox_select)
             self._listbox.bind("<Return>", self._on_return)
 
+            # allow keyboard navigation inside listbox
+            self._listbox.bind("<Down>", self._on_listbox_down)
+            self._listbox.bind("<Up>", self._on_listbox_up)
+
             # mouse wheel on listbox (cross-platform)
             self._listbox.bind("<MouseWheel>", lambda e: self._listbox.yview_scroll(int(-1*(e.delta/120)), "units"))
             self._listbox.bind("<Button-4>", lambda e: self._listbox.yview_scroll(-1, "units"))
@@ -435,6 +459,9 @@ class AutocompleteCombobox(ttk.Frame):
             self.entry.icursor(tk.END)
         # keep it visible until user confirms (we choose to hide after selection to mimic combobox)
         self._hide_listbox()
+        # คืน focus
+        self.entry.focus_set()
+
 
     def _on_down(self, event):
         if self._listbox:
@@ -459,6 +486,9 @@ class AutocompleteCombobox(ttk.Frame):
             self.var.set(self._filtered_values[0])
         self.entry.icursor(tk.END)
         self._hide_listbox()
+        # ⭐ คืน focus
+        self.entry.focus_set()
+
         return "break"
 
     def _on_click_outside(self, event):
@@ -495,3 +525,42 @@ class AutocompleteCombobox(ttk.Frame):
 
         # otherwise close
         self._hide_listbox()
+
+    def _on_listbox_down(self, event):
+        if not self._listbox:
+            return "break"
+        size = self._listbox.size()
+        cur = self._listbox.curselection()
+        if cur:
+            next_idx = min(cur[0] + 1, size - 1)
+        else:
+            next_idx = 0
+
+        self._listbox.selection_clear(0, tk.END)
+        self._listbox.selection_set(next_idx)
+        self._listbox.activate(next_idx)
+
+        # ⭐ ให้ scroll ลงมาด้วย
+        self._listbox.see(next_idx)
+
+        return "break"
+
+    def _on_listbox_up(self, event):
+        if not self._listbox:
+            return "break"
+        size = self._listbox.size()
+        cur = self._listbox.curselection()
+        if cur:
+            next_idx = max(cur[0] - 1, 0)
+        else:
+            next_idx = size - 1
+
+        self._listbox.selection_clear(0, tk.END)
+        self._listbox.selection_set(next_idx)
+        self._listbox.activate(next_idx)
+
+        # ⭐ ให้ scroll ขึ้นด้วย
+        self._listbox.see(next_idx)
+
+        return "break"
+

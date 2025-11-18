@@ -215,7 +215,6 @@ class HistoryPage(tk.Frame):
         self.prev_btn.config(state="normal" if self.current_page > 0 else "disabled")
         self.next_btn.config(state="normal" if self.current_page < total_pages-1 else "disabled")
 
-
     def prev_page(self):
         if self.current_page > 0:
             self.current_page -= 1
@@ -242,6 +241,25 @@ class HistoryPage(tk.Frame):
         producer_values = sorted(self.emp_map.values())
 
         tk.Label(popup, text="แก้ไข", font=GS["font_bold"], bg=GS["bg_frame"]).pack(pady=6)
+
+        # bottom buttons
+        btns = tk.Frame(popup, bg=GS["bg_frame"])
+        btns.pack(pady=10)
+        tk.Button(btns, text="❌ ยกเลิก", width=10,
+                  command=popup.destroy, bg=GS["button_bg"],
+                  fg=GS["button_fg"], activebackground=GS["button_active"],
+                  font=GS["font_normal"]
+        ).pack(side="left", padx=8)
+
+        tk.Button(btns, text="✔ บันทึก", width=10,
+                  command=lambda: self._confirm_save(row_data, popup,
+                                                     num_var, abbr_var,
+                                                     producer_var, product_var),
+                  bg=GS["button_bg"], fg=GS["button_fg"],
+                  activebackground=GS["button_active"],
+                  font=GS["font_normal"]
+        ).pack(side="left", padx=8)
+
         content = tk.Frame(popup, bg=GS["bg_frame"])
         content.pack(expand=True, fill="both", padx=16, pady=6)
 
@@ -286,24 +304,6 @@ class HistoryPage(tk.Frame):
 
         content.grid_columnconfigure(1, weight=1)
         content.grid_columnconfigure(3, weight=1)
-
-        # bottom buttons
-        btns = tk.Frame(popup, bg=GS["bg_frame"])
-        btns.pack(pady=10)
-        tk.Button(btns, text="❌ ยกเลิก", width=10,
-                  command=popup.destroy, bg=GS["button_bg"],
-                  fg=GS["button_fg"], activebackground=GS["button_active"],
-                  font=GS["font_normal"]
-        ).pack(side="left", padx=8)
-
-        tk.Button(btns, text="✔ บันทึก", width=10,
-                  command=lambda: self._confirm_save(row_data, popup,
-                                                     num_var, abbr_var,
-                                                     producer_var, product_var),
-                  bg=GS["button_bg"], fg=GS["button_fg"],
-                  activebackground=GS["button_active"],
-                  font=GS["font_normal"]
-        ).pack(side="left", padx=8)
 
         popup.show()
         popup.transient(self)

@@ -6,6 +6,8 @@ from page_99_Utils import (
     get_db_connection,
     reset_db_connection,
     read_station_id,
+    show_info_popup,
+    GLOBAL_STYLE as GS,
     AutocompleteCombobox
 )
 
@@ -102,67 +104,109 @@ class AddPage(tk.Frame):
             if conn: conn.close()
 
         # --- Label + Input Styling (ใช้จาก config ด้านบน) ---
-        # แถว 1
-        tk.Label(form_frame, text="เลขย่อ:", **self.LABEL_STYLE).grid(row=0, column=0, sticky="e", padx=5, pady=8)
-        tk.Entry(form_frame, textvariable=self.abbr_var, **self.ENTRY_STYLE).grid(row=0, column=1, sticky="we", padx=5, pady=8)
 
-        tk.Label(form_frame, text="สินค้า:", **self.LABEL_STYLE).grid(row=0, column=2, sticky="e", padx=5, pady=8)
-        self.product_entry = AutocompleteCombobox(
-            form_frame,
-            values=sorted(self.mat_map.values()) if self.mat_map else [],
-            textvariable=self.product_var,entry_font=self.FONT_ENTRY,
-            listbox_font=self.FONT_ENTRY
-        )
-        self.product_entry.grid(row=0, column=3, sticky="we", padx=5, pady=8)
-
-        # แถว 2
-        tk.Label(form_frame, text="ผู้ผลิต:", **self.LABEL_STYLE).grid(row=1, column=0, sticky="e", padx=5, pady=8)
-        self.producer_entry = AutocompleteCombobox(
-            form_frame,
-            values=sorted(self.emp_map.values()) if self.emp_map else [],
-            textvariable=self.producer_var,entry_font=self.FONT_ENTRY,
-            listbox_font=self.FONT_ENTRY
-        )
-        self.producer_entry.grid(row=1, column=1, sticky="we", padx=5, pady=8)
-
-        tk.Label(form_frame, text="น้ำหนัก:", **self.LABEL_STYLE).grid(row=1, column=2, sticky="e", padx=5, pady=8)
-        tk.Entry(
-            form_frame, textvariable=self.weight_display_var, state="readonly",
-            readonlybackground=self.COLOR_WHITE, **self.ENTRY_STYLE
-        ).grid(row=1, column=3, sticky="we", padx=5, pady=8)
+        # -------------------------------
+        # ตั้งค่า column ให้คอลัมน์ 3 (ช่องน้ำหนัก) กว้างเป็นพิเศษ
+        # -------------------------------
+        form_frame.columnconfigure(0, weight=1)
+        form_frame.columnconfigure(1, weight=1)
+        form_frame.columnconfigure(2, weight=1)
+        form_frame.columnconfigure(3, weight=1, minsize=200)  # คอลัมน์ 3 สำหรับน้ำหนัก
 
 
-        # --- ปุ่มปรับศูนย์ / ยกเลิก / บันทึก เรียงในบรรทัดเดียว ---
+        # -------------------------------
+        # แถว 1 — ปุ่มกด
+        # -------------------------------
         def go_back_action():
             self.reset_inputs()
             go_back()
 
         btn_frame = tk.Frame(form_frame, bg=self.COLOR_WHITE)
-        btn_frame.grid(row=2, column=0, columnspan=4, pady=25)  # span ครอบทุกคอลัมน์เพื่อจัดกึ่งกลาง
+        btn_frame.grid(row=0, column=0, columnspan=4, pady=25)
 
-        # ปุ่มปรับศูนย์
         btn_zero = tk.Button(
             btn_frame, text="⚖ ปรับศูนย์", command=self.zero_weight,
             bg="#b5dcff", fg=self.COLOR_TEXT, activebackground="#d3ebff",
             **self.BUTTON_STYLE
         )
-        btn_zero.pack(side="left", padx=(0, 40))  # ช่องว่างมากระหว่างปรับศูนย์กับยกเลิก
+        btn_zero.pack(side="left", padx=(0, 40))
 
-        # ปุ่มยกเลิก
         btn_cancel = tk.Button(
             btn_frame, text="❌ ยกเลิก", command=go_back_action,
             bg="#ffb5b5", fg="#003366", activebackground="#ffd6d6",
             **self.BUTTON_STYLE
         )
-        btn_cancel.pack(side="left", padx=(35, 15))  # ช่องว่างเล็กระหว่างยกเลิกกับบันทึก
+        btn_cancel.pack(side="left", padx=(35, 15))
 
-        # ปุ่มบันทึก
         btn_save = tk.Button(
             btn_frame, text="✔ บันทึก", command=self.confirm_save,
             bg="#b5dcff", fg="#003366", activebackground="#d3ebff",
             **self.BUTTON_STYLE
         )
         btn_save.pack(side="left", padx=(20, 0))
+
+
+        # -------------------------------
+        # แถว 2 — เลขย่อ + สินค้า
+        # -------------------------------
+        tk.Label(form_frame, text="เลขย่อ:", **self.LABEL_STYLE).grid(row=1, column=0, sticky="e", padx=5, pady=8)
+        tk.Entry(form_frame, textvariable=self.abbr_var, **self.ENTRY_STYLE).grid(row=1, column=1, sticky="we", padx=5, pady=8)
+
+        tk.Label(form_frame, text="สินค้า:", **self.LABEL_STYLE).grid(row=1, column=2, sticky="e", padx=5, pady=8)
+        self.product_entry = AutocompleteCombobox(
+            form_frame,
+            values=sorted(self.mat_map.values()) if self.mat_map else [],
+            textvariable=self.product_var, entry_font=self.FONT_ENTRY,
+            listbox_font=self.FONT_ENTRY
+        )
+        self.product_entry.grid(row=1, column=3, sticky="we", padx=5, pady=8)
+
+
+        # -------------------------------
+        # แถว 3 — ผู้ผลิต + น้ำหนัก (ช่องใหญ่ขึ้น)
+        # -------------------------------
+        tk.Label(form_frame, text="ผู้ผลิต:", **self.LABEL_STYLE).grid(row=2, column=0, sticky="e", padx=5, pady=8)
+        self.producer_entry = AutocompleteCombobox(
+            form_frame,
+            values=sorted(self.emp_map.values()) if self.emp_map else [],
+            textvariable=self.producer_var, entry_font=self.FONT_ENTRY,
+            listbox_font=self.FONT_ENTRY
+        )
+        self.producer_entry.grid(row=2, column=1, sticky="we", padx=5, pady=8)
+
+        # Label น้ำหนัก (ฟอนต์ใหญ่ขึ้น)
+        tk.Label(
+            form_frame, 
+            text="น้ำหนัก:", 
+            font=GS["FONT_WEIGHT_LABEL"],
+            bg=form_frame.cget("bg"), 
+            fg=self.COLOR_TEXT
+        ).grid(row=2, column=2, sticky="e", padx=5, pady=8)
+
+        # ทำ copy ENTRY_STYLE แล้วลบ font ออก
+        weight_style = self.ENTRY_STYLE.copy()
+        weight_style.pop("font", None)   # เอา font ออกเพื่อไม่ให้ซ้ำ
+
+        # ช่องแสดงน้ำหนัก (ใหญ่ขึ้น + ฟอนต์ใหญ่ขึ้น)
+        self.weight_entry = tk.Entry(
+            form_frame,
+            textvariable=self.weight_display_var,
+            state="readonly",
+            font=GS["FONT_WEIGHT_VALUE"],          # ฟอนต์ใหญ่ขึ้น
+            readonlybackground=self.COLOR_WHITE,
+            justify="center",                      # จัดกลางให้เด่น
+            width=10, 
+            **weight_style                           # ใช้ style ที่ลบ font ออกแล้ว
+        )
+        self.weight_entry.grid(
+            row=2, column=3,
+            sticky="we",
+            padx=5, pady=8,
+            ipadx=40,   # ขยายความกว้าง
+            ipady=10    # ขยายความสูง
+        )
+
+
 
     # ------------------------------- HELPERS ------------------------------- #
     def _update_weight_display_from_var(self):
@@ -207,21 +251,51 @@ class AddPage(tk.Frame):
         producer_name = self.producer_var.get()
         weight = self.weight_var.get()
 
-        if not abbr or not product_name or not producer_name:
-            print("⚠️ ข้อมูลไม่ครบ")
+        # --- 1) ตรวจว่ากรอกข้อมูลครบไหม ---
+        missing_fields = []
+
+        if not abbr or abbr.strip() == "":
+            missing_fields.append("เลขย่อสินค้า")
+
+        if not product_name or product_name.strip() == "":
+            missing_fields.append("ชื่อสินค้า")
+
+        if not producer_name or producer_name.strip() == "":
+            missing_fields.append("ชื่อผู้ผลิต")
+
+        if missing_fields:
+            msg = "กรุณากรอกข้อมูลให้ครบทุกช่อง:\n- " + "\n- ".join(missing_fields)
+            show_info_popup(self, "ข้อมูลไม่ครบ", msg)
+            print("⚠️ ข้อมูลไม่ครบ:", missing_fields)
             return
 
-        product_id = self.mat_map_reverse.get(product_name)
-        producer_id = self.emp_map_reverse.get(producer_name)
-        if product_id is None or producer_id is None:
-            print("⚠️ ไม่พบสินค้า หรือ ผู้ผลิตในฐานข้อมูล")
+
+        # --- 2) ตรวจว่าชื่อสินค้าและผู้ผลิตต้องตรงตามฐานข้อมูล (dropdown) ---
+        product_id = self.mat_map_reverse.get(product_name.strip())
+        producer_id = self.emp_map_reverse.get(producer_name.strip())
+
+        invalid_fields = []
+
+        if product_id is None:
+            invalid_fields.append("ชื่อสินค้าไม่ตรงกับข้อมูลในระบบ")
+
+        if producer_id is None:
+            invalid_fields.append("ชื่อผู้ผลิตไม่ตรงกับข้อมูลในระบบ")
+
+        if invalid_fields:
+            msg = "ไม่สามารถบันทึกได้ เนื่องจาก:\n- " + "\n- ".join(invalid_fields)
+            show_info_popup(self, "ข้อมูลไม่ถูกต้อง", msg)
+            print("⚠️ ข้อมูลไม่ถูกต้อง:", invalid_fields)
             return
 
-        try:
+        # --- ถ้าผ่านทุกเงื่อนไข ก็ไปทำส่วนบันทึกได้เลย ---
+        print("✓ ข้อมูลถูกต้อง พร้อมบันทึก")
+
+
+        try: #สร้างชุดตัวเลข pd_batch_id และ หมายเลข pd_item_number ใหม่
             conn = get_db_connection()
             cur = conn.cursor()
             user_id = read_station_id()
-
             # 1️⃣ ตรวจสอบว่า batch ล่าสุดของเดือนนี้คืออะไร
             cur.execute("""
                 SELECT batch_number, pd_batch_id
@@ -232,10 +306,8 @@ class AddPage(tk.Frame):
                 LIMIT 1
             """)
             last_batch = cur.fetchone()
-
             now = time.localtime()
             yyMM = time.strftime("%y%m", now)
-
             if last_batch and last_batch[0].startswith(yyMM):
                 # มี batch ของเดือนนี้อยู่แล้ว → ใช้ batch เดิม
                 batch_number, pd_batch_id = last_batch
@@ -249,13 +321,11 @@ class AddPage(tk.Frame):
                 """)
                 count = cur.fetchone()[0] or 0
                 batch_number = f"{yyMM}{count:03d}"
-
                 cur.execute("""
                     INSERT INTO pd (batch_number, pd_pub_date, user_id, pd_status_id, pd_group_id)
                     VALUES (%s, NOW(), %s, %s, %s)
                 """, (batch_number, user_id, 1, None))
                 pd_batch_id = cur.lastrowid
-
             # 2️⃣ หาลำดับ item ล่าสุดใน batch นี้
             cur.execute("""
                 SELECT COUNT(pd_item_id)
@@ -263,10 +333,8 @@ class AddPage(tk.Frame):
                 WHERE pd_batch_id = %s
             """, (pd_batch_id,))
             item_count = cur.fetchone()[0] or 0
-
             # 3️⃣ สร้างหมายเลข item ใหม่ เช่น 2511012-000
             pd_item_number = f"{batch_number}-{item_count:03d}"
-
             # 4️⃣ บันทึกข้อมูลลง pd_item
             cur.execute("""
                 INSERT INTO pd_item (
@@ -279,10 +347,12 @@ class AddPage(tk.Frame):
             ))
 
             conn.commit()
+            show_info_popup(self, "สำเร็จ", "บันทึกข้อมูลเรียบร้อยแล้ว")
             print(f"✅ เพิ่มข้อมูลสำเร็จ: {batch_number}-{item_count:03d}, {abbr}, {product_name}, {producer_name}, {weight}")
             self.reset_inputs()
 
         except Exception as e:
+            show_info_popup(self, "ผิดพลาด", f"ไม่สามารถบันทึกข้อมูลได้:\n{e}")
             print("❌ เพิ่มข้อมูลล้มเหลว:", e)
 
         finally:
