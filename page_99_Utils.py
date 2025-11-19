@@ -284,283 +284,291 @@ load_config()
 # ===== Autocomplete Combobox =====
 from tkinter import ttk
 
+
+import tkinter as tk
+from tkinter import ttk
+
+
 class AutocompleteCombobox(ttk.Frame):
     """
-    Entry + dropdown listbox overlay.
-    Usage:
-      ac = AutocompleteCombobox(parent, values=list_of_strings, textvariable=tv,
-                                entry_font=("Segoe UI",12), listbox_font=("Segoe UI",12))
+    Autocomplete Combobox (ปรับปรุง)
+    - ป้องกัน popup ลอยตามมาที่หน้าอื่น
+    - ปิด popup ทุกอันเมื่อ destroy หรือเปลี่ยนหน้า
+    - popup จะสร้างเฉพาะเมื่อ widget visible
     """
+
+    _OPEN_INSTANCES = set()
+
     def __init__(self, master=None, values=None, textvariable=None,
-                 listbox_maxheight=6, entry_font=None, listbox_font=None, **kwargs):
-        # IMPORTANT: don't pass font kwargs to the Frame itself
+                 entry_font=None, listbox_font=None, listbox_maxheight=6, **kwargs):
         super().__init__(master, **kwargs)
 
-        self._values = list(values or [])
-        self._filtered_values = self._values.copy()
+        self.values = list(values or [])
+        self.filtered = self.values.copy()
         self.var = textvariable or tk.StringVar()
-
-        self._listbox_maxheight = listbox_maxheight
         self.entry_font = entry_font
         self.listbox_font = listbox_font
+        self.listbox_maxheight = listbox_maxheight
 
-        # layout
+        self._active = False
         self.columnconfigure(0, weight=1)
-        self.columnconfigure(1, weight=0)
 
-        # Entry (ttk.Entry)
+        # Entry
         self.entry = ttk.Entry(self, textvariable=self.var)
-        self.entry.grid(row=0, column=0, sticky="nsew", padx=(0,2))
-
+        self.entry.grid(row=0, column=0, sticky="nsew", padx=(0, 3))
         if self.entry_font:
-            try:
-                self.entry.configure(font=self.entry_font)
-            except Exception:
-                pass
+            self.entry.config(font=self.entry_font)
 
-        # dropdown button
-        self.btn = ttk.Button(self, text="▼", width=2, command=self._toggle_listbox)
+        # Dropdown button
+        self.btn = ttk.Button(self, text="▼", width=2, command=self.toggle)
         self.btn.grid(row=0, column=1, sticky="ns")
 
-        # overlay listbox
-        self._toplevel = None
-        self._listbox = None
+        # Popup
+        self.popup = None
+        self.listbox = None
 
-        # events
-        self.var.trace_add("write", self._on_var_change)
-        self.entry.bind("<Down>", self._on_down)
-        self.entry.bind("<Return>", self._on_return)
-        self.entry.bind("<Escape>", self._hide_listbox)
+        # Events
+        #self.var.trace_add("write", self._safe_on_type)
+        self.entry.bind("<Down>", self._entry_down)
+        self.entry.bind("<Return>", self._entry_enter)
+        self.entry.bind("<Escape>", lambda e: self.close())
 
-        # Only hide when clicking truly outside: global click handler with safe checks
-        # Use the toplevel of entry to bind once (avoid duplicate binds if many widgets)
-        try:
-            top = self.entry.winfo_toplevel()
-            top.bind_all("<Button-1>", self._on_click_outside, add="+")
-        except Exception:
-            # fallback no global bind
-            pass
+        # Bind trace ตอน widget focus แทน
+        self.entry.bind("<FocusIn>", self._on_focus_in)
+        self.entry.bind("<FocusOut>", self._on_focus_out)
 
-        # Keep a flag so we don't hide while interacting with the listbox
-        self._ignore_next_focus_loss = False
+        # Close popup when widget destroyed
+        self.bind("<Destroy>", self._on_self_destroy)
+        self.entry.bind("<Destroy>", self._on_self_destroy)
+
+        # Global click-outside detection (bind on root; add="+" keeps existing binds)
+        root = self.entry.winfo_toplevel()
+        root.bind("<Button-1>", self._click_outside, add="+")
+
+    def _on_focus_in(self, event=None):
+        self._active = True
+        # bind trace เมื่อโฟกัส
+        self._trace_id = self.var.trace_add("write", self._safe_on_type)
+
+    def _on_focus_out(self, event=None):
+        self._active = False
+        # ยกเลิก trace เมื่อออกโฟกัส
+        if hasattr(self, "_trace_id"):
+            self.var.trace_remove("write", self._trace_id)
+            del self._trace_id
 
 
-    def set_values(self, values):
-        self._values = list(values or [])
-        self._filtered_values = self._values.copy()
 
-    def set_fonts(self, entry_font=None, listbox_font=None):
-        self.entry_font = entry_font or self.entry_font
-        self.listbox_font = listbox_font or self.listbox_font
-        if self.entry_font:
+    # ---------------------------
+    # Class helpers
+    # ---------------------------
+    @classmethod
+    def close_all(cls, except_instance=None):
+        for inst in list(cls._OPEN_INSTANCES):
             try:
-                self.entry.configure(font=self.entry_font)
+                if inst is not except_instance:
+                    inst.close()
             except Exception:
                 pass
-        if self._listbox and self.listbox_font:
-            try:
-                self._listbox.configure(font=self.listbox_font)
-            except Exception:
-                pass
 
-    def _toggle_listbox(self):
-        if self._toplevel and tk.Toplevel.winfo_exists(self._toplevel):
-            self._hide_listbox()
+    @classmethod
+    def destroy_all_popups(cls):
+        for inst in list(cls._OPEN_INSTANCES):
+            inst.close()
+        cls._OPEN_INSTANCES.clear()
+
+    def _register_open(self):
+        AutocompleteCombobox._OPEN_INSTANCES.add(self)
+
+    def _unregister_open(self):
+        AutocompleteCombobox._OPEN_INSTANCES.discard(self)
+
+    # ---------------------------
+    # Popup handling
+    # ---------------------------
+    def toggle(self):
+        if self.popup and self.popup.winfo_exists():
+            self.close()
+        else:
+            self.filtered = self.values
+            self.open()
+
+    def open(self):
+        # ตรวจสอบว่า widget ยัง visible
+        if not self.winfo_ismapped():
             return
 
-        self._filtered_values = self._values
-        if self._filtered_values:
-            self._show_listbox()
-            self.entry.focus_set()
-
-    def _on_var_change(self, *args):
-        text = (self.var.get() or "").lower()
-        if text == "":
-            self._filtered_values = self._values
-        else:
-            self._filtered_values = [v for v in self._values if text in v.lower()]
-
-        if self._filtered_values:
-            self._show_listbox()
-        else:
-            self._hide_listbox()
-
-    def _show_listbox(self):
-        if not self._filtered_values:
-            self._hide_listbox()
+        AutocompleteCombobox.close_all(except_instance=self)
+        if not self.filtered:
+            self.close()
             return
 
-        if self._toplevel is None or not tk.Toplevel.winfo_exists(self._toplevel):
-            parent_top = self.entry.winfo_toplevel()
-            # Create overlay toplevel owned by same root — this helps with focus behavior
-            self._toplevel = tk.Toplevel(parent_top)
-            self._toplevel.wm_overrideredirect(True)
-            # do NOT grab focus here
-            self._listbox = tk.Listbox(self._toplevel, activestyle="dotbox")
-            # set fonts if provided
+        if not self.popup or not self.popup.winfo_exists():
+            self.popup = tk.Toplevel(self)
+            self.popup.transient(self)
+            self.popup.overrideredirect(True)
+
+            self.listbox = tk.Listbox(self.popup, activestyle="none")
             if self.listbox_font:
-                try:
-                    self._listbox.configure(font=self.listbox_font)
-                except Exception:
-                    pass
-            self._listbox.pack(fill="both", expand=True)
+                self.listbox.config(font=self.listbox_font)
+            self.listbox.pack(fill="both", expand=True)
 
-            self._listbox.bind("<<ListboxSelect>>", self._on_listbox_select)
-            self._listbox.bind("<Return>", self._on_return)
+            # Listbox events
+            self.listbox.bind("<<ListboxSelect>>", self._select)
+            self.listbox.bind("<Return>", self._lb_enter)
+            self.listbox.bind("<Down>", self._lb_down)
+            self.listbox.bind("<Up>", self._lb_up)
 
-            # allow keyboard navigation inside listbox
-            self._listbox.bind("<Down>", self._on_listbox_down)
-            self._listbox.bind("<Up>", self._on_listbox_up)
+        # Fill items
+        self.listbox.delete(0, tk.END)
+        for v in self.filtered:
+            self.listbox.insert(tk.END, v)
 
-            # mouse wheel on listbox (cross-platform)
-            self._listbox.bind("<MouseWheel>", lambda e: self._listbox.yview_scroll(int(-1*(e.delta/120)), "units"))
-            self._listbox.bind("<Button-4>", lambda e: self._listbox.yview_scroll(-1, "units"))
-            self._listbox.bind("<Button-5>", lambda e: self._listbox.yview_scroll(1, "units"))
-
-            # clicking inside listbox should not hide it
-            self._listbox.bind("<Button-1>", lambda e: None)
-
-        # fill listbox
-        self._listbox.delete(0, tk.END)
-        for v in self._filtered_values:
-            self._listbox.insert(tk.END, v)
-
-        # place directly under entry
+        # Position
         x = self.entry.winfo_rootx()
         y = self.entry.winfo_rooty() + self.entry.winfo_height()
-        width = max(self.entry.winfo_width(), 140)
-        visible = min(self._listbox_maxheight, len(self._filtered_values))
-        self._listbox.config(height=visible)
-        # geometry height: use requested height of listbox
-        h = self._listbox.winfo_reqheight()
-        try:
-            self._toplevel.geometry(f"{width}x{h}+{x}+{y}")
-        except Exception:
-            # fallback: simple placement
-            self._toplevel.geometry(f"+{x}+{y}")
-        self._toplevel.deiconify()
+        width = max(self.entry.winfo_width() + self.btn.winfo_width(), 120)
+        visible = min(self.listbox_maxheight, len(self.filtered))
+        self.listbox.config(height=visible)
+        h = self.listbox.winfo_reqheight()
+        self.popup.geometry(f"{width}x{h}+{x}+{y}")
+        self.popup.deiconify()
 
-    def _hide_listbox(self, event=None):
-        if self._toplevel and tk.Toplevel.winfo_exists(self._toplevel):
+        self._register_open()
+        self.after(10, self._focus_listbox_safely)
+
+    def close(self):
+        self._unregister_open()
+        if self.listbox:
+            try: self.listbox.destroy()
+            except: pass
+            self.listbox = None
+        if self.popup:
             try:
-                self._toplevel.destroy()
-            except Exception:
-                pass
-        self._toplevel = None
-        self._listbox = None
+                if self.popup.winfo_exists():
+                    self.popup.destroy()
+            except: pass
+            self.popup = None
 
-    def _on_listbox_select(self, event):
-        if not self._listbox:
+    # ---------------------------
+    # Safe type handler
+    # ---------------------------
+    def _safe_on_type(self, *args):
+        # ถ้า frame ไม่ visible หรือ destroyed → skip
+        if not self.winfo_ismapped():
             return
-        sel = self._listbox.curselection()
-        if sel:
-            val = self._listbox.get(sel[0])
-            self.var.set(val)
-            self.entry.icursor(tk.END)
-        # keep it visible until user confirms (we choose to hide after selection to mimic combobox)
-        self._hide_listbox()
-        # คืน focus
-        self.entry.focus_set()
+        self.on_type(*args)
 
+    def on_type(self, *args):
+        text = (self.var.get() or "").lower()
+        if not text:
+            self.filtered = self.values
+        else:
+            self.filtered = [v for v in self.values if text in v.lower()]
+        if self.filtered:
+            self.open()
+        else:
+            self.close()
 
-    def _on_down(self, event):
-        if self._listbox:
+    # ---------------------------
+    # Destroy / focus
+    # ---------------------------
+    def _on_self_destroy(self, event=None):
+        self.close()
+
+    def _focus_listbox_safely(self):
+        if self.listbox and self.popup and self.popup.winfo_exists():
             try:
-                self._listbox.focus_set()
-                self._listbox.selection_clear(0, tk.END)
-                self._listbox.selection_set(0)
-                self._listbox.activate(0)
+                self.listbox.focus_force()
+                if self.listbox.size() > 0:
+                    self.listbox.selection_clear(0, tk.END)
+                    self.listbox.selection_set(0)
+                    self.listbox.activate(0)
             except Exception:
                 pass
-            return "break"
 
-    def _on_return(self, event):
-        if self._listbox:
-            sel = self._listbox.curselection()
-            if sel:
-                val = self._listbox.get(sel[0])
-                self.var.set(val)
-            elif self._filtered_values:
-                self.var.set(self._filtered_values[0])
-        elif self._filtered_values:
-            self.var.set(self._filtered_values[0])
-        self.entry.icursor(tk.END)
-        self._hide_listbox()
-        # ⭐ คืน focus
-        self.entry.focus_set()
+    # ---------------------------
+    # Listbox select & navigation
+    # ---------------------------
+    def _select(self, event=None):
+        if self.listbox:
+            cur = self.listbox.curselection()
+            if cur:
+                self.var.set(self.listbox.get(cur[0]))
+        self.close()
+        self.after(1, lambda: self.entry.focus_force())
+        self.after(2, lambda: self.entry.icursor(tk.END))
 
+    def _entry_down(self, event):
+        self.open()
+        self.after(5, self._focus_listbox_safely)
         return "break"
 
-    def _on_click_outside(self, event):
-        # event.x_root / y_root are global screen coords
-        if not self._toplevel:
-            return
+    def _entry_enter(self, event):
+        if self.filtered:
+            self.var.set(self.filtered[0])
+        self.close()
+        self.after(1, lambda: self.entry.focus_force())
+        self.after(2, lambda: self.entry.icursor(tk.END))
+        return "break"
 
+    def _lb_down(self, event):
+        if not self.listbox: return "break"
+        size = self.listbox.size()
+        cur = self.listbox.curselection()
+        idx = cur[0] + 1 if cur else 0
+        if idx >= size: idx = size - 1
+        self.listbox.selection_clear(0, tk.END)
+        self.listbox.selection_set(idx)
+        self.listbox.activate(idx)
+        self.listbox.see(idx)
+        return "break"
+
+    def _lb_up(self, event):
+        if not self.listbox: return "break"
+        size = self.listbox.size()
+        cur = self.listbox.curselection()
+        idx = cur[0] - 1 if cur else 0
+        if idx < 0: idx = 0
+        self.listbox.selection_clear(0, tk.END)
+        self.listbox.selection_set(idx)
+        self.listbox.activate(idx)
+        self.listbox.see(idx)
+        return "break"
+
+    def _lb_enter(self, event):
+        self._select()
+        return "break"
+
+    # ---------------------------
+    # Click outside to close
+    # ---------------------------
+    def _click_outside(self, event):
+        if not self.popup: return
         widget = event.widget
-
-        # if click is inside entry/button/listbox -> keep open
-        if widget in (self.entry, self.btn, self._listbox):
-            return
-
-        # click inside the overlay listbox area -> keep open
-        if self._toplevel and tk.Toplevel.winfo_exists(self._toplevel):
-            x1 = self._toplevel.winfo_rootx()
-            y1 = self._toplevel.winfo_rooty()
-            x2 = x1 + self._toplevel.winfo_width()
-            y2 = y1 + self._toplevel.winfo_height()
+        if widget in (self.entry, self.btn, self.listbox): return
+        try:
+            x1 = self.popup.winfo_rootx()
+            y1 = self.popup.winfo_rooty()
+            x2 = x1 + self.popup.winfo_width()
+            y2 = y1 + self.popup.winfo_height()
             if x1 <= event.x_root <= x2 and y1 <= event.y_root <= y2:
                 return
+        except Exception: pass
+        self.close()
 
-        # click inside the parent Toplevel (e.g. popup) -> do not close
-        try:
-            parent_top = self.entry.winfo_toplevel()
-            px1 = parent_top.winfo_rootx()
-            py1 = parent_top.winfo_rooty()
-            px2 = px1 + parent_top.winfo_width()
-            py2 = py1 + parent_top.winfo_height()
-            if px1 <= event.x_root <= px2 and py1 <= event.y_root <= py2:
-                return
-        except Exception:
-            pass
+    # ---------------------------
+    # External API
+    # ---------------------------
+    def set_values(self, values):
+        self.values = list(values or [])
+        self.filtered = self.values.copy()
 
-        # otherwise close
-        self._hide_listbox()
-
-    def _on_listbox_down(self, event):
-        if not self._listbox:
-            return "break"
-        size = self._listbox.size()
-        cur = self._listbox.curselection()
-        if cur:
-            next_idx = min(cur[0] + 1, size - 1)
-        else:
-            next_idx = 0
-
-        self._listbox.selection_clear(0, tk.END)
-        self._listbox.selection_set(next_idx)
-        self._listbox.activate(next_idx)
-
-        # ⭐ ให้ scroll ลงมาด้วย
-        self._listbox.see(next_idx)
-
-        return "break"
-
-    def _on_listbox_up(self, event):
-        if not self._listbox:
-            return "break"
-        size = self._listbox.size()
-        cur = self._listbox.curselection()
-        if cur:
-            next_idx = max(cur[0] - 1, 0)
-        else:
-            next_idx = size - 1
-
-        self._listbox.selection_clear(0, tk.END)
-        self._listbox.selection_set(next_idx)
-        self._listbox.activate(next_idx)
-
-        # ⭐ ให้ scroll ขึ้นด้วย
-        self._listbox.see(next_idx)
-
-        return "break"
-
+    def set_fonts(self, entry_font=None, listbox_font=None):
+        if entry_font:
+            self.entry_font = entry_font
+            self.entry.config(font=entry_font)
+        if listbox_font:
+            self.listbox_font = listbox_font
+            if self.listbox:
+                self.listbox.config(font=listbox_font)

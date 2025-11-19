@@ -118,8 +118,17 @@ class AddPage(tk.Frame):
         # แถว 1 — ปุ่มกด
         # -------------------------------
         def go_back_action():
+            # ปิด dropdown ของ combobox ทั้งหมดที่อาจเปิดอยู่ (safety)
+            try:
+                AutocompleteCombobox.destroy_all_popups()
+            except Exception:
+                pass
+
+            # reset inputs (ซึ่งตอนนี้ไม่จำเป็นต้องตรวจสอบ hasattr อีก)
             self.reset_inputs()
+
             go_back()
+
 
         btn_frame = tk.Frame(form_frame, bg=self.COLOR_WHITE)
         btn_frame.grid(row=0, column=0, columnspan=4, pady=25)
