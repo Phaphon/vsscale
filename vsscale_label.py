@@ -8,7 +8,7 @@ except ImportError:
     serial = None  # กัน error ถ้าไม่มี pyserial ตอน mock
 
 # ===== CONFIG =====
-USE_MOCK_LABEL = True   # 🔹 เปลี่ยนเป็น False ถ้าใช้งานจริง
+USE_MOCK_LABEL = False   # 🔹 เปลี่ยนเป็น False ถ้าใช้งานจริง
 # ==================
 
 def print_label(
