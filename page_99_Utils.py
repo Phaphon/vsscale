@@ -334,8 +334,8 @@ class AutocompleteCombobox(ttk.Frame):
         self.entry.bind("<Escape>", lambda e: self.close())
 
         # Bind trace ตอน widget focus แทน
-        self.entry.bind("<FocusIn>", self._on_focus_in)
-        self.entry.bind("<FocusOut>", self._on_focus_out)
+        #self.entry.bind("<FocusIn>", self._on_focus_in)
+        #self.entry.bind("<FocusOut>", self._on_focus_out)
 
         # Close popup when widget destroyed
         self.bind("<Destroy>", self._on_self_destroy)
@@ -479,7 +479,7 @@ class AutocompleteCombobox(ttk.Frame):
     def _focus_listbox_safely(self):
         if self.listbox and self.popup and self.popup.winfo_exists():
             try:
-                self.listbox.focus_force()
+                #self.listbox.focus_force()
                 if self.listbox.size() > 0:
                     self.listbox.selection_clear(0, tk.END)
                     self.listbox.selection_set(0)
