@@ -77,9 +77,9 @@ else:
     def read_weight():
         # คืนค่าน้ำหนักสุ่ม 2000–2500
         ret = random.randint(2000, 2500)
-        print(f"🎭 [MOCK] Read weight: {ret}")
+        #print(f"🎭 [MOCK] Read weight: {ret}")
         return ret
 
     def set_zero():
-        print("🎭 [MOCK] Set weight to zero.")
+        #print("🎭 [MOCK] Set weight to zero.")
         return True

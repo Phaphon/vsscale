@@ -2,7 +2,11 @@ import tkinter as tk
 import mysql.connector
 import json, os
 
-CONFIG_FILE = os.path.join(os.path.dirname(__file__), "config.json")
+
+# ให้ชี้ไปที่ไฟล์ config ภายในโฟลเดอร์โปรเจกต์เสมอ
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
+#CONFIG_FILE = os.path.join(os.path.dirname(__file__), "config.json")
 
 # page_00_style.py
 
@@ -214,15 +218,17 @@ def load_config():
         db_config = DEFAULT_CONFIG.copy()
         save_config()  # สร้างไฟล์ใหม่ทันที
 
-def save_config(new_config):
+def save_config(new_config=None):
     """บันทึกค่า config ปัจจุบันลงไฟล์"""
-    db_config.update(new_config)
-    print("dabug Saving config in function save_config:", db_config)  # debug
+    global db_config
+    if new_config is not None:
+        db_config.update(new_config)
     try:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(db_config, f, ensure_ascii=False, indent=2)
     except Exception as e:
         print(f"⚠ บันทึก config ล้มเหลว: {e}")
+
 
 def set_db_config(host, user, password, database, station,
                   settings_password=None, history_password=None):
@@ -295,6 +301,8 @@ class AutocompleteCombobox(ttk.Frame):
     - ป้องกัน popup ลอยตามมาที่หน้าอื่น
     - ปิด popup ทุกอันเมื่อ destroy หรือเปลี่ยนหน้า
     - popup จะสร้างเฉพาะเมื่อ widget visible
+    - พิมพ์แล้วแสดง dropdown แต่ไม่แย่ง focus จาก Entry
+    - กดลูกศร (Up/Down) จะนำ focus ไปยัง listbox เพื่อเลื่อนรายการ
     """
 
     _OPEN_INSTANCES = set()
@@ -310,7 +318,11 @@ class AutocompleteCombobox(ttk.Frame):
         self.listbox_font = listbox_font
         self.listbox_maxheight = listbox_maxheight
 
+        # สถานะช่วยคุมพฤติกรรม
         self._active = False
+        self._opened_from_typing = False  # ถ้าเปิดจากการพิมพ์ -> อย่าแย่ง focus
+        self._registered_click = False
+
         self.columnconfigure(0, weight=1)
 
         # Entry
@@ -318,6 +330,15 @@ class AutocompleteCombobox(ttk.Frame):
         self.entry.grid(row=0, column=0, sticky="nsew", padx=(0, 3))
         if self.entry_font:
             self.entry.config(font=self.entry_font)
+
+        # เปิด dropdown อัตโนมัติเมื่อพิมพ์ (KeyRelease ใช้เพื่อตัดปัญหา focus หลุด)
+        self.entry.bind("<KeyRelease>", self._on_key_release)
+
+        # Bind ลูกศรที่ entry เพื่อให้กดแล้วย้ายไป listbox
+        self.entry.bind("<Down>", self._entry_down)
+        self.entry.bind("<Up>", self._entry_up)
+        self.entry.bind("<Return>", self._entry_enter)
+        self.entry.bind("<Escape>", lambda e: self.close())
 
         # Dropdown button
         self.btn = ttk.Button(self, text="▼", width=2, command=self.toggle)
@@ -327,37 +348,20 @@ class AutocompleteCombobox(ttk.Frame):
         self.popup = None
         self.listbox = None
 
-        # Events
-        #self.var.trace_add("write", self._safe_on_type)
-        self.entry.bind("<Down>", self._entry_down)
-        self.entry.bind("<Return>", self._entry_enter)
-        self.entry.bind("<Escape>", lambda e: self.close())
-
-        # Bind trace ตอน widget focus แทน
-        #self.entry.bind("<FocusIn>", self._on_focus_in)
-        #self.entry.bind("<FocusOut>", self._on_focus_out)
-
         # Close popup when widget destroyed
         self.bind("<Destroy>", self._on_self_destroy)
         self.entry.bind("<Destroy>", self._on_self_destroy)
 
-        # Global click-outside detection (bind on root; add="+" keeps existing binds)
+        # Global click-outside detection (bind on root once)
         root = self.entry.winfo_toplevel()
-        root.bind("<Button-1>", self._click_outside, add="+")
-
-    def _on_focus_in(self, event=None):
-        self._active = True
-        # bind trace เมื่อโฟกัส
-        self._trace_id = self.var.trace_add("write", self._safe_on_type)
-
-    def _on_focus_out(self, event=None):
-        self._active = False
-        # ยกเลิก trace เมื่อออกโฟกัส
-        if hasattr(self, "_trace_id"):
-            self.var.trace_remove("write", self._trace_id)
-            del self._trace_id
-
-
+        # register bind once per root if not already (avoid duplicate handlers)
+        try:
+            if not getattr(root, "_autocomplete_bound", False):
+                root.bind_all("<Button-1>", self._click_outside, add="+")
+                root._autocomplete_bound = True
+        except Exception:
+            # fallback - still bind directly
+            root.bind_all("<Button-1>", self._click_outside, add="+")
 
     # ---------------------------
     # Class helpers
@@ -384,6 +388,38 @@ class AutocompleteCombobox(ttk.Frame):
         AutocompleteCombobox._OPEN_INSTANCES.discard(self)
 
     # ---------------------------
+    # Key / typing handler
+    # ---------------------------
+    def _on_key_release(self, event):
+        # ปุ่มที่ไม่ควรทริก autocomplete ระหว่างพิมพ์
+        ignore_keys = {"Up", "Down", "Left", "Right", "Return", "Escape", "Tab"}
+
+        if event.keysym in ignore_keys:
+            # ถ้ากดลูกศร (Down/Up) ให้ไป focus listbox (ถ้ามี) ผ่าน handler entry bind
+            return
+
+        # ถ้า widget ไม่แสดง -> ปิด popup
+        if not self.winfo_ismapped():
+            self.close()
+            return
+
+        # update filtered list ตามข้อความปัจจุบัน
+        text = (self.var.get() or "").lower()
+        if not text:
+            self.filtered = self.values
+        else:
+            self.filtered = [v for v in self.values if text in v.lower()]
+
+        if self.filtered:
+            # เปิด popup โดยบอกว่า "เปิดจากการพิมพ์" เพื่อไม่แย่ง focus
+            self._opened_from_typing = True
+            self.open()
+            # เคลียร์ flag เล็กน้อยหลัง delay เล็กๆ (ให้การเปิดเสร็จ)
+            self.after(80, lambda: setattr(self, "_opened_from_typing", False))
+        else:
+            self.close()
+
+    # ---------------------------
     # Popup handling
     # ---------------------------
     def toggle(self):
@@ -391,21 +427,31 @@ class AutocompleteCombobox(ttk.Frame):
             self.close()
         else:
             self.filtered = self.values
+            # toggle via button → ให้ focus ไปที่ listbox (ปกติ)
+            self._opened_from_typing = False
             self.open()
 
     def open(self):
-        # ตรวจสอบว่า widget ยัง visible
+        # ตรวจสอบว่า widget ยัง mapped (visible)
         if not self.winfo_ismapped():
             return
 
+        # ปิด popup อื่นก่อน เพื่อให้มีแค่หนึ่งเปิด
         AutocompleteCombobox.close_all(except_instance=self)
+
         if not self.filtered:
             self.close()
             return
 
+        # สร้าง popup ถ้ายังไม่มี
         if not self.popup or not self.popup.winfo_exists():
-            self.popup = tk.Toplevel(self)
-            self.popup.transient(self)
+            parent_top = self.entry.winfo_toplevel()
+            self.popup = tk.Toplevel(parent_top)
+            # ทำให้เป็น owned by top-level ของแอพ (ลดปัญหา popup ติดค้างหน้าต่างอื่น)
+            try:
+                self.popup.transient(parent_top)
+            except Exception:
+                pass
             self.popup.overrideredirect(True)
 
             self.listbox = tk.Listbox(self.popup, activestyle="none")
@@ -413,82 +459,93 @@ class AutocompleteCombobox(ttk.Frame):
                 self.listbox.config(font=self.listbox_font)
             self.listbox.pack(fill="both", expand=True)
 
-            # Listbox events
+            # Listbox events (เมื่อ listbox มี focus)
             self.listbox.bind("<<ListboxSelect>>", self._select)
             self.listbox.bind("<Return>", self._lb_enter)
             self.listbox.bind("<Down>", self._lb_down)
             self.listbox.bind("<Up>", self._lb_up)
 
-        # Fill items
+            # ถ้าคลิกใน listbox ด้วยเมาส์ -> อย่าให้ global click ปิดทันที
+            self.listbox.bind("<Button-1>", lambda e: None)
+
+        # เติมรายการ
         self.listbox.delete(0, tk.END)
         for v in self.filtered:
             self.listbox.insert(tk.END, v)
 
-        # Position
+        # ตำแหน่งและขนาด
         x = self.entry.winfo_rootx()
         y = self.entry.winfo_rooty() + self.entry.winfo_height()
         width = max(self.entry.winfo_width() + self.btn.winfo_width(), 120)
         visible = min(self.listbox_maxheight, len(self.filtered))
         self.listbox.config(height=visible)
         h = self.listbox.winfo_reqheight()
-        self.popup.geometry(f"{width}x{h}+{x}+{y}")
+        try:
+            self.popup.geometry(f"{width}x{h}+{x}+{y}")
+        except Exception:
+            self.popup.geometry(f"+{x}+{y}")
         self.popup.deiconify()
+        self.popup.lift()
 
+        # register
         self._register_open()
+
+        # focus listbox only when NOT opened from typing (i.e. opened by button or arrow)
+        # we still call _focus_listbox_safely so the code centralizes selection logic
         self.after(10, self._focus_listbox_safely)
 
     def close(self):
         self._unregister_open()
         if self.listbox:
-            try: self.listbox.destroy()
-            except: pass
+            try:
+                self.listbox.destroy()
+            except Exception:
+                pass
             self.listbox = None
         if self.popup:
             try:
                 if self.popup.winfo_exists():
                     self.popup.destroy()
-            except: pass
+            except Exception:
+                pass
             self.popup = None
 
     # ---------------------------
-    # Safe type handler
+    # Focus logic (central)
     # ---------------------------
-    def _safe_on_type(self, *args):
-        # ถ้า frame ไม่ visible หรือ destroyed → skip
-        if not self.winfo_ismapped():
-            return
-        self.on_type(*args)
-
-    def on_type(self, *args):
-        text = (self.var.get() or "").lower()
-        if not text:
-            self.filtered = self.values
-        else:
-            self.filtered = [v for v in self.values if text in v.lower()]
-        if self.filtered:
-            self.open()
-        else:
-            self.close()
-
-    # ---------------------------
-    # Destroy / focus
-    # ---------------------------
-    def _on_self_destroy(self, event=None):
-        self.close()
-
     def _focus_listbox_safely(self):
-        if self.listbox and self.popup and self.popup.winfo_exists():
+        """
+        Focus listbox only when appropriate:
+        - ถ้า popup เปิดมาจากการพิมพ์ -> อย่าแย่ง focus (ผู้ใช้กำลังพิมพ์)
+        - ถ้าต้องการให้ listbox ได้ focus (เช่น กดปุ่ม dropdown หรือกดลูกศรลง) → ให้ focus
+        """
+        if not (self.listbox and self.popup and self.popup.winfo_exists()):
+            return
+
+        # ถ้ามาเพราะ typing → ไม่แย่ง focus
+        if getattr(self, "_opened_from_typing", False):
+            # แต่ยังต้อง ensure selection แรกถูกเลือก (highlight) เพื่อให้เห็นตัวเลือก
             try:
-                #self.listbox.focus_force()
                 if self.listbox.size() > 0:
                     self.listbox.selection_clear(0, tk.END)
                     self.listbox.selection_set(0)
                     self.listbox.activate(0)
             except Exception:
                 pass
+            return
+
+        # ปกติให้ focus ไปที่ listbox เพื่อให้ลูกศรทำงานทันที
+        try:
+            self.listbox.focus_force()
+            if self.listbox.size() > 0:
+                self.listbox.selection_clear(0, tk.END)
+                self.listbox.selection_set(0)
+                self.listbox.activate(0)
+        except Exception:
+            pass
 
     # ---------------------------
-    # Listbox select & navigation
+    # Listbox selection / navigation
     # ---------------------------
     def _select(self, event=None):
         if self.listbox:
@@ -496,12 +553,32 @@ class AutocompleteCombobox(ttk.Frame):
             if cur:
                 self.var.set(self.listbox.get(cur[0]))
         self.close()
+        # คืน focus ให้ entry เพื่อให้พิมพ์ต่อได้
         self.after(1, lambda: self.entry.focus_force())
         self.after(2, lambda: self.entry.icursor(tk.END))
 
+    # เมื่อกด ↓ ขณะ entry มี focus → เปิด popup (ถ้าปิดอยู่) แล้วย้าย focus ไป listbox
     def _entry_down(self, event):
+        # ถ้าไม่มีรายการให้แสดงก็เปิดและ return
+        self.filtered = self.filtered or self.values
+        self._opened_from_typing = False
         self.open()
+        # ให้หลังเล็กน้อยแล้ว focus listbox เพื่อให้ลูกศรทำงาน
         self.after(5, self._focus_listbox_safely)
+        return "break"
+
+    # เมื่อกด ↑ ขณะ entry มี focus → เปิด popup แล้วให้ไป select รายการสุดท้าย
+    def _entry_up(self, event):
+        self.filtered = self.filtered or self.values
+        self._opened_from_typing = False
+        self.open()
+        # เลือกตัวสุดท้ายก่อน focus
+        self.after(5, lambda: (
+            self.listbox.selection_clear(0, tk.END),
+            self.listbox.selection_set(max(0, self.listbox.size()-1)) if self.listbox else None,
+            self.listbox.activate(max(0, (self.listbox.size()-1))) if self.listbox else None,
+            self._focus_listbox_safely()
+        ))
         return "break"
 
     def _entry_enter(self, event):
@@ -513,11 +590,13 @@ class AutocompleteCombobox(ttk.Frame):
         return "break"
 
     def _lb_down(self, event):
-        if not self.listbox: return "break"
+        if not self.listbox:
+            return "break"
         size = self.listbox.size()
         cur = self.listbox.curselection()
         idx = cur[0] + 1 if cur else 0
-        if idx >= size: idx = size - 1
+        if idx >= size:
+            idx = size - 1
         self.listbox.selection_clear(0, tk.END)
         self.listbox.selection_set(idx)
         self.listbox.activate(idx)
@@ -525,11 +604,13 @@ class AutocompleteCombobox(ttk.Frame):
         return "break"
 
     def _lb_up(self, event):
-        if not self.listbox: return "break"
+        if not self.listbox:
+            return "break"
         size = self.listbox.size()
         cur = self.listbox.curselection()
         idx = cur[0] - 1 if cur else 0
-        if idx < 0: idx = 0
+        if idx < 0:
+            idx = 0
         self.listbox.selection_clear(0, tk.END)
         self.listbox.selection_set(idx)
         self.listbox.activate(idx)
@@ -544,17 +625,47 @@ class AutocompleteCombobox(ttk.Frame):
     # Click outside to close
     # ---------------------------
     def _click_outside(self, event):
-        if not self.popup: return
+        # ถ้าไม่มี popup อะไรให้ทำ
+        if not getattr(self, "popup", None):
+            return
+
+        # ถ้าคลิกบน entry / button / listbox ของ instance นี้ -> ไม่ต้องปิด
         widget = event.widget
-        if widget in (self.entry, self.btn, self.listbox): return
+        if widget in (self.entry, self.btn, self.listbox):
+            return
+
+        # ถ้าคลิกในพื้นที่ popup -> ไม่ปิด
         try:
-            x1 = self.popup.winfo_rootx()
-            y1 = self.popup.winfo_rooty()
-            x2 = x1 + self.popup.winfo_width()
-            y2 = y1 + self.popup.winfo_height()
-            if x1 <= event.x_root <= x2 and y1 <= event.y_root <= y2:
+            if self.popup and self.popup.winfo_exists():
+                x1 = self.popup.winfo_rootx()
+                y1 = self.popup.winfo_rooty()
+                x2 = x1 + self.popup.winfo_width()
+                y2 = y1 + self.popup.winfo_height()
+                if x1 <= event.x_root <= x2 and y1 <= event.y_root <= y2:
+                    return
+        except Exception:
+            pass
+
+        # ถ้าคลิกในพื้นที่ top-level เจ้าของ (เช่น popup แก้ไข) -> อย่าปิด
+        try:
+            parent_top = self.entry.winfo_toplevel()
+            px1 = parent_top.winfo_rootx()
+            py1 = parent_top.winfo_rooty()
+            px2 = px1 + parent_top.winfo_width()
+            py2 = py1 + parent_top.winfo_height()
+            if px1 <= event.x_root <= px2 and py1 <= event.y_root <= py2:
                 return
-        except Exception: pass
+        except Exception:
+            pass
+
+        # มิฉะนั้นปิด
+        self.close()
+
+    # ---------------------------
+    # Destroy / misc
+    # ---------------------------
+    def _on_self_destroy(self, event=None):
+        # เมื่อ widget ถูกทำลาย ให้ปิด popup แน่นอน
         self.close()
 
     # ---------------------------

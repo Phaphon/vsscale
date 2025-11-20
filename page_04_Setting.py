@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox
-from page_99_Utils import db_config, save_config
+from page_99_Utils import db_config, save_config, CONFIG_FILE
 import mysql.connector
 import json
 
@@ -68,9 +68,10 @@ class SettingPage(tk.Frame):
     def reload_entries_from_config(self):
         """โหลดค่าจาก config.json แล้วใส่กลับลงช่องกรอก"""
         try:
-            with open("config.json", "r", encoding="utf-8") as f:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 cfg = json.load(f)
-        except Exception:
+        except Exception as e:
+            print("⚠ reload_entries_from_config: ไม่สามารถอ่าน config ได้, ใช้ db_config แทน:", e)
             cfg = db_config
 
         # ล้างค่าก่อน
@@ -82,6 +83,7 @@ class SettingPage(tk.Frame):
         # ใส่ค่าปัจจุบันกลับ
         self.sql_ip_entry.insert(0, cfg.get("host", ""))
         self.sql_user_entry.insert(0, cfg.get("user", ""))
+        # ใส่ password ที่อ่านได้ (ไม่ลบ)
         self.sql_pw_entry.insert(0, cfg.get("password", ""))
         self.station_id_entry.insert(0, cfg.get("station", ""))
 
@@ -91,7 +93,7 @@ class SettingPage(tk.Frame):
         pw   = self.sql_pw_entry.get().strip()
         station = self.station_id_entry.get().strip()
         database = "verp_dev"
-
+        #database = "rpisql"
 
         new_config = {
             "host": host,

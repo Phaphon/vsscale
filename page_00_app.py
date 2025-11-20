@@ -54,6 +54,19 @@ class App(tk.Tk):
         # แสดงหน้าเริ่มต้น
         self.show_frame("Home")
 
+        # ⭐ บังคับ fullscreen อีกครั้งหลัง Desktop โหลดเสร็จ
+        self.after(500, self.force_fullscreen)
+
+    def force_fullscreen(self):
+        try:
+            self.attributes("-fullscreen", True)
+            self.lift()
+            self.focus_force()
+            self.attributes("-topmost", True)
+            self.after(300, lambda: self.attributes("-topmost", False))
+        except:
+            pass
+
     def open_settings(self):
         def do_open_settings():
             # โค้ดเปิดหน้า setting จริง ๆ
