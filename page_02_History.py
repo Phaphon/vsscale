@@ -371,3 +371,80 @@ class HistoryPage(tk.Frame):
                 print(f"⚠ หมายเลขหน้าไม่ถูกต้อง (1-{total_pages})")
         except ValueError:
             print("⚠ กรุณาพิมพ์ตัวเลขเท่านั้น")
+
+    def _confirm_save(
+        self, old_row, popup, num_var, abbr_var, producer_var, product_var
+    ):
+        """
+        บันทึกข้อมูล (เวอร์ชันเก่า)
+        - ไม่มี show_info_popup
+        - ไม่มี error popup
+        - ใช้ create_password_popup ก่อนบันทึก
+        - print error อย่างเดียวถ้าล้มเหลว
+        """
+
+        try:
+            pd_item_id = old_row[0]
+            abbr = abbr_var.get().strip()
+            producer_name = producer_var.get().strip()
+            product_name = product_var.get().strip()
+
+            # lookup id แบบของเก่า
+            product_id = self.mat_map_reverse.get(product_name, product_name)
+            producer_id = self.emp_map_reverse.get(producer_name, producer_name)
+
+            # ---------------------------
+            # ฟังก์ชันบันทึกจริง
+            # ---------------------------
+            def do_save():
+                try:
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+
+                    cursor.execute("""
+                        UPDATE pd_item
+                        SET pd_item_remark=%s,
+                            emp_id=%s,
+                            result_id=%s
+                        WHERE pd_item_id=%s
+                    """, (
+                        abbr,
+                        producer_id,
+                        product_id,
+                        pd_item_id
+                    ))
+
+                    conn.commit()
+
+                    # อัปเดตข้อมูลใน row ที่โชว์อยู่
+                    old_row[2] = abbr
+                    old_row[3] = producer_name
+                    old_row[4] = product_name
+
+                    # refresh UI ตามสไตล์เก่า
+                    self.display_table()
+
+                    popup.destroy()
+
+                except Exception as e:
+                    print("❌ แก้ไขข้อมูล DB ล้มเหลว:", e)
+
+                finally:
+                    try:
+                        cursor.close()
+                        conn.close()
+                    except:
+                        pass
+
+            # ---------------------------
+            # เปิด popup ขอรหัสผ่าน
+            # ---------------------------
+            create_password_popup(
+                popup,
+                correct_password=get_password("history"),
+                message="กรุณาใส่รหัสผ่านเพื่อยืนยันการแก้ไข",
+                confirm_callback=do_save
+            )
+
+        except Exception as e:
+            print("❌ ERROR ใน _confirm_save:", e)
