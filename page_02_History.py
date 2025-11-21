@@ -68,6 +68,14 @@ class HistoryPage(tk.Frame):
 
         self.load_data()
         self.display_table()
+        self.bind_all("<Key>", self.on_key_press)
+    def on_key_press(self, event):
+        if event.keysym == "Left" and self.focus:
+            self.prev_page()
+            print("Left key pressed")
+        elif event.keysym == "Right" and self.focus:
+            self.next_page()
+            print("Right key pressed")
 
     def load_data(self):
         try:

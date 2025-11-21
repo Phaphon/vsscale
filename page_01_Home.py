@@ -57,3 +57,5 @@ class HomePage(tk.Frame):
             fg="#003366"
         )
         title.place(relx=0.5, rely=0.1, anchor="center")
+    
+    
