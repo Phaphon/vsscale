@@ -58,4 +58,9 @@ class HomePage(tk.Frame):
         )
         title.place(relx=0.5, rely=0.1, anchor="center")
     
+    def on_show(self):
+        print("HomePage: on_show()")
+
+    def on_hide(self):
+        pass
     

@@ -66,9 +66,10 @@ class HistoryPage(tk.Frame):
         self.page_entry.insert(0, "1")
         self.page_entry.bind("<Return>", self.go_to_page)
 
-        self.load_data()
-        self.display_table()
+        # self.load_data()
+        # self.display_table()
         self.bind_all("<Key>", self.on_key_press)
+    
     def on_key_press(self, event):
         if event.keysym == "Left" and self.focus:
             self.prev_page()
@@ -383,13 +384,6 @@ class HistoryPage(tk.Frame):
     def _confirm_save(
         self, old_row, popup, num_var, abbr_var, producer_var, product_var
     ):
-        """
-        บันทึกข้อมูล (เวอร์ชันเก่า)
-        - ไม่มี show_info_popup
-        - ไม่มี error popup
-        - ใช้ create_password_popup ก่อนบันทึก
-        - print error อย่างเดียวถ้าล้มเหลว
-        """
 
         try:
             pd_item_id = old_row[0]
@@ -456,3 +450,12 @@ class HistoryPage(tk.Frame):
 
         except Exception as e:
             print("❌ ERROR ใน _confirm_save:", e)
+
+    def on_show(self):
+        """จะถูกเรียกเมื่อเข้าไปหน้า History"""
+        self.load_data()
+        self.display_table()
+
+    def on_hide(self):
+        """เรียกเมื่อออกจากหน้า History"""
+        pass

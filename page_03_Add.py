@@ -389,3 +389,12 @@ class AddPage(tk.Frame):
             print("❌ อ่านน้ำหนักล้มเหลว:", e)
         finally:
             self.after(500, self.update_weight_loop)
+
+
+    def on_show(self):
+        print("AddPage: start weight loop")
+        self.start_weight_loop()
+
+    def on_hide(self):
+        print("AddPage: stop weight loop")
+        self.stop_weight_loop()

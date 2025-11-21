@@ -115,3 +115,9 @@ class SettingPage(tk.Frame):
         except Exception as e:
             messagebox.showerror("ผิดพลาด", f"❌ เชื่อมต่อฐานข้อมูลไม่ได้:\n{e}")
             self.reload_entries_from_config()
+
+    def on_show(self):
+        self.reload_entries_from_config()
+
+    def on_hide(self):
+        pass
